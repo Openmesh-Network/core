@@ -19,3 +19,12 @@
 
 # Go workspace file
 go.work
+
+# GoLand
+.idea
+
+# Visual Studio Code
+.vscode
+
+# Arbitrary trashes
+.DS_Store
