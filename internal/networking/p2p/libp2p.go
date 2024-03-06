@@ -155,7 +155,7 @@ func (i *Instance) Publish(topic string, message []byte) error {
 }
 
 // Subscribe to a specific topic
-func (i *Instance) Subscribe(topic string) (<-chan []byte, error) {
+func (i *Instance) Subscribe(topic string) (<-chan *pubsub.Message, error) {
     // Check if the topic handle exists on this instance (i.e., joined this topic)
     handle, exists := i.topics[topic]
     if !exists {
@@ -167,14 +167,14 @@ func (i *Instance) Subscribe(topic string) (<-chan []byte, error) {
         return nil, err
     }
 
-    msgChan := make(chan []byte, 100)
+    msgChan := make(chan *pubsub.Message, 100)
     go i.waitMsg(subscribe, msgChan)
 
     return msgChan, nil
 }
 
 // waitMsg wait for new messages and send it to the specific channel
-func (i *Instance) waitMsg(handle *pubsub.Subscription, ch chan<- []byte) {
+func (i *Instance) waitMsg(handle *pubsub.Subscription, ch chan<- *pubsub.Message) {
     for {
         msg, err := handle.Next(i.cancelCtx)
         if err != nil {
@@ -187,7 +187,7 @@ func (i *Instance) waitMsg(handle *pubsub.Subscription, ch chan<- []byte) {
             continue
         }
         // Handle it over via channel
-        ch <- msg.Data
+        ch <- msg
     }
 }
 

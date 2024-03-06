@@ -44,7 +44,7 @@ func TestPublish(t *testing.T) {
             case <-c.Done():
                 return
             case m := <-msg:
-                t.Logf("Got a message from pub-sub: %s", string(m))
+                t.Logf("Got a message from pub-sub: %s", string(m.Data))
             }
         }
     }()
