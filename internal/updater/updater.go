@@ -1,4 +1,4 @@
-package main
+package updater
 
 import (
 	"bytes"
@@ -312,7 +312,7 @@ func HostToString(h host.Host) string {
 	return addr.Encapsulate(hostAddr).String()
 }
 
-func main() {
+func referenceMainImplementation() {
 	sigs := make(chan os.Signal, 1)
 
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -413,5 +413,4 @@ func main() {
 			}
 		}
 	}
-
 }
