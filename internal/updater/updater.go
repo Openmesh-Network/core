@@ -260,7 +260,7 @@ func (u *UpdaterData) UpdateIfAppropriate(h host.Host) bool {
 				return buf.Bytes(), nil
 			}
 
-			// Note(Tom): Need to specify this multiaddr because I need to connect so someone who is seeding this CID.
+			// Note(Tom): Need to specify this multiaddr because I need to connect so someone who is definitely seeding this CID.
 			buf, err := getFile(h, c, "/ip4/10.0.17.23/tcp/4001/p2p/12D3KooWPnX64ZDrYZof4cyJhAA9NK2Yxygs5C1uCS2zg5x1PbHL")
 
 			if err != nil {
@@ -312,7 +312,7 @@ func HostToString(h host.Host) string {
 	return addr.Encapsulate(hostAddr).String()
 }
 
-func referenceMainImplementation() {
+func referenceUsageDeleteLater() {
 	sigs := make(chan os.Signal, 1)
 
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
