@@ -2,21 +2,25 @@ package validator
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
+
+// TODO: Want acceptance tests on the Sources table. ie go through the whole table, verify against rules, and test the source's symbols are up.
 
 func TestBinanceJoin(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	t.Log("Got here no issue")
-	c, err := wsCEXJoin(ctx, Sources[1], "usdc.usdt")
+	t.Log(Sources[2].Symbols[0])
+	c, err := defaultJoinCEX(ctx, Sources[2], Sources[2].Symbols[0])
 
 	if err != nil {
 		t.Error(err)
 	} else {
 		for i := 0; i < 10; i++ {
-			t.Log(string(<-c))
+			fmt.Println(string(<-c))
 		}
 		cancel()
 		t.Log("Stopping...")
@@ -25,13 +29,4 @@ func TestBinanceJoin(t *testing.T) {
 }
 
 func TestBinanceFull(t *testing.T) {
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
-
-	// buffer, err := Subscribe(ctx, Sources[0], "usdc.usdt", 1024)
-	// if err != nil {
-	// 	panic(err)
-	// } else {
-	// 	buffer.Read()
-	// }
 }

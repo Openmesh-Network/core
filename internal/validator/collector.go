@@ -1,54 +1,57 @@
 package validator
 
 import (
-	"bytes"
 	"strings"
 
 	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
 )
 
+// TODO: Check which exchanges are wanted / desireable. Also, find which symbols we should care about.
+
 // Defines a "source" of data, all supported sources are laid out in the Sources array.
-// We opt for this approach over oop for clarity and extensibility. We're going to have 1
-// version of this program running for all the validators, so defining all the sources in a clear table
-// seems more appropriate.
+// We opt for this approach over oop for clarity and extensibility.
 type Source struct {
 	Name     string
 	JoinFunc func(ctx context.Context, source Source, symbol string) (chan []byte, error)
 	ApiURL   string
 	Symbols  []string
-	// Note that the Request field has {{symbol}} replaced with the symbol.
+	// Request field will have {{symbol}} replaced with the actual symbol in the call to wsCEXJoin.
 	Request string
 }
 
 // The master table with all our sources.
 var Sources = [...]Source{
 	// Exchanges:
-	{"binance", wsCEXJoin, "wss://stream.binance.com:9443/ws", []string{"usdt.usdc", "btc.eth", "eth.usdt"}, "{\"method\": \"SUBSCRIBE\", \"params\": [ \"{{symbol}}@aggTrade\" ], \"id\": 1}"},
-	{"dydx", wsCEXJoin, "wss://api.dydx.exchange/v3/ws", []string{}, "{\"type\": \"subscribe\", \"id\": \"{{symbol}}\", \"channel\": \"v3_trades\"}"},
-	{"coingecko", wsCEXJoin, "", []string{}, ""},
+	// Note that the symbols are incomplete as they are undecided.
+	{"binance", defaultJoinCEX, "wss://stream.binance.com:9443/ws", []string{"usdt.usdc", "btc.eth", "eth.usdt"}, "{\"method\": \"SUBSCRIBE\", \"params\": [ \"{{symbol}}@aggTrade\" ], \"id\": 1}"},
+	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{symbol}}\" ], \"channels\": [ \"ticker\" ]}"},
+	{"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{symbol}}\", \"channel\": \"v3_trades\"}"},
+
 	// Blockchains:
 	// {"ethereum", "", nil, []string{}},
 }
 
-// Subscribe will join the chosen source and .
-func Subscribe(ctx context.Context, source Source, symbol string, bufferSizeMax int) (*bytes.Buffer, error) {
+// Subscribe will connect to the chosen source and create a channel to get data out of it.
+func Subscribe(ctx context.Context, source Source, symbol string, bufferSizeMax int) (chan []byte, error) {
+	// TODO: Not sure if it's better to use a shared buffer here instead of a channel.
+	// That would let us do custom compression behaviour at the exchange level.
+	// Thought maybe a ringbuffer would be appropriate..
+
 	msgChannel, err := source.JoinFunc(ctx, source, symbol)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Move allocation elsewhere.
-	writeMessageBuffer := bytes.NewBuffer(make([]byte, bufferSizeMax))
-	writeMessageBuffer.Reset()
-
+	// We do this instead of just returning the msgChannel because we want control over the compresion in the future.
+	outChannel := make(chan []byte)
 	go func() {
 		for {
 			select {
 			case msg := <-msgChannel:
 				// TODO: Add optional callback to re-encode the data for better size efficiency here.
 
-				writeMessageBuffer.Write(msg)
+				outChannel <- msg
 				break
 			case <-ctx.Done():
 				break
@@ -56,35 +59,34 @@ func Subscribe(ctx context.Context, source Source, symbol string, bufferSizeMax 
 		}
 	}()
 
-	return writeMessageBuffer, nil
+	return outChannel, nil
 }
 
-func wsCEXJoin(ctx context.Context, source Source, symbol string) (chan []byte, error) {
-	url := "wss://stream.binance.com:9443/ws"
-	ws, err := websocket.Dial(url, "", url)
+// Default function for CEXs since the majority of them use this functionality.
+// Note that we assume that the symbol is in the source's format.
+func defaultJoinCEX(ctx context.Context, source Source, symbol string) (chan []byte, error) {
+	ws, err := websocket.Dial(source.ApiURL, "", source.ApiURL)
 	if err != nil {
 		panic(err)
 	}
 
-	// Convert to binance symbol format.
-	// NOTE(Tom): This feels like a waste, might be better to just use their format.
-	split := strings.Split(symbol, ".")
-	exchangeSymbol := split[0] + split[1]
-
-	request := strings.Replace(source.Request, "{{symbol}}", exchangeSymbol, 1)
+	// HACK: This is the simplest tool for the job right now. It still feels wrong though.
+	request := strings.Replace(source.Request, "{{symbol}}", symbol, 1)
 
 	ws.Write([]byte(request))
 
-	// HACK: This feels very ugly, there might be a better approach.
 	msgChannel := make(chan []byte)
 	go func() {
-		buf := make([]byte, 512)
+		// XXX: Move this goshforsaken allocation at some point (Maybe move to collector class?).
+		// Also note that this means messages higher than 2048 bytes in length will be sent in 2 chunks over the channel.
+		buf := make([]byte, 2048)
 		for {
 			n, err := ws.Read(buf)
 			if err != nil {
 				// Connection was severed, so quit.
 				return
 			} else {
+				// Append message to message channel.
 				msgChannel <- buf[:n]
 			}
 		}
@@ -92,91 +94,9 @@ func wsCEXJoin(ctx context.Context, source Source, symbol string) (chan []byte, 
 
 	go func() {
 		<-ctx.Done()
+		// Closing the websocket here should end the other goroutine.
 		ws.Close()
 	}()
 
 	return msgChannel, nil
 }
-
-// func dydxJoin(ctx context.Context, symbol string) (chan []byte, error) {
-// 	url := "wss://api.dydx.exchange/v3/ws"
-// 	ws, err := websocket.Dial(url, "", url)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	// Convert to binance symbol format.
-// 	// NOTE(Tom): This feels like a waste, might be better to just use their format.
-// 	split := strings.Split(symbol, ".")
-// 	dydxSymbol := split[0] + split[1]
-
-// 	// TODO: Which kind of trade do we want to store? Need to talk with team.
-// 	ws.Write([]byte("{\"type\": \"subscribe\", \"id\": \"" + dydxSymbol + "\", \"channel\": \"v3_trades\"}"))
-
-// 	// HACK: This feels very ugly, there might be a better approach.
-// 	msgChannel := make(chan []byte)
-// 	go func() {
-// 		buf := make([]byte, 512)
-// 		for {
-// 			n, err := ws.Read(buf)
-// 			if err != nil {
-// 				// Connection was severed, so quit.
-// 				return
-// 			} else {
-// 				msgChannel <- buf[:n]
-// 			}
-// 		}
-// 	}()
-
-// 	go func() {
-// 		<-ctx.Done()
-// 		ws.Close()
-// 	}()
-
-// 	return msgChannel, nil
-// }
-
-func coinspotJoin(val string) chan []byte {
-	return nil
-}
-
-func ethRead(val string) chan []byte {
-	return nil
-}
-
-// Need something that converts symbols to our format (or do we?).
-// Need to connect to a source and listen to the data, if the data exceeds a buffer then it's given to the validator.
-// How is our data structured? Is it sources then symbols or just sources?
-// What are the "lanes" in our system?
-
-// What is the common case? The common case is we're subscribed to a source and plan to switch relatively quickly.
-
-// type DataSource interface {
-// 	Name() string
-// 	Symbols() []string
-// 	JoinFunc(string) chan []byte
-// 	ReadFunc(string) chan []byte
-// }
-
-// var dataSources = [...]DataSource{
-// 	Binance{},
-// 	// Coinbase{},
-// }
-
-// type Binance struct {
-// }
-
-// func (b Binance) Name() string {
-// 	return "binance"
-// }
-// func (b Binance) Symbols() []string {
-// 	return []string{"usdt-usdc", "btc-eth", "eth-usdt"}
-// }
-// func (b Binance) JoinFunc(a string) chan []byte {
-// 	var bruh chan []byte
-// 	return bruh
-// }
-// func (b Binance) ReadFunc(a string) chan []byte {
-// 	var bruh chan []byte
-// 	return bruh
-// }
