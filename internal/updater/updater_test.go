@@ -38,7 +38,7 @@ func TestEndToEnd(t *testing.T) {
 			}
 		}
 
-		var updater UpdaterData
+		var updater UpdaterInstance
 		updater.TrustedKeys = make([]PublicKey, 0, len(keysTrusted))
 		updater.LatestVerifiedRequests = make([]UpdateRequest, trustedKeyCount)
 

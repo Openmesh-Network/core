@@ -52,11 +52,11 @@ type UpdateRequestContent struct {
 	BinaryCid []byte
 }
 
-type UpdaterData struct {
+type UpdaterInstance struct {
 	TrustedKeys []PublicKey
 
 	LatestVerifiedRequests []UpdateRequest
-	CurrentVersion         [32]byte // TODO: this should be passed as an argv to child process
+	// CurrentVersion         [32]byte // TODO: this should be passed as an argv to child process
 }
 
 func HashRequestContent(content UpdateRequestContent) []byte {
@@ -66,7 +66,40 @@ func HashRequestContent(content UpdateRequestContent) []byte {
 	return h.Sum(nil)
 }
 
-func (u *UpdaterData) VerifyRequest(req UpdateRequest) bool {
+var numbers = []int{
+	1,
+	plusTwo(2),
+}
+
+func plusTwo(a int) int {
+	return 2 + a
+}
+
+func PublicKeyFromBase64(base64KeyString string) PublicKey {
+	key_bytes, err := base64.RawStdEncoding.DecodeString(base64KeyString)
+
+	if err != nil {
+		panic(err)
+	}
+
+	publicKey := PublicKey{}
+
+	for i := range key_bytes {
+		publicKey[i] = key_bytes[i]
+	}
+
+	return publicKey
+}
+
+func NewInstance(trustedKeys []PublicKey) *UpdaterInstance {
+	updater := UpdaterInstance{}
+	updater.TrustedKeys = trustedKeys
+	updater.LatestVerifiedRequests = make([]UpdateRequest, len(updater.TrustedKeys))
+
+	return &updater
+}
+
+func (u *UpdaterInstance) VerifyRequest(req UpdateRequest) bool {
 	trustedIndex := -1
 	for i, tk := range u.TrustedKeys {
 		if bytes.Equal(tk[:], req.PublicKey[:]) {
@@ -82,7 +115,6 @@ func (u *UpdaterData) VerifyRequest(req UpdateRequest) bool {
 		hashBytes := HashRequestContent(req.Content)
 		verified := ed25519.Verify(req.PublicKey[:], hashBytes, req.Signature[:])
 
-		// check nonce
 		if verified {
 			// fmt.Println("Trusted index: ", trustedIndex)
 			// fmt.Println("LatestVerifiedRequests: ", u.LatestVerifiedRequests)
@@ -112,7 +144,7 @@ func (u *UpdaterData) VerifyRequest(req UpdateRequest) bool {
 	}
 }
 
-func (u *UpdaterData) UpdateIfAppropriate(h host.Host) bool {
+func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 	isVerified := false
 	c := cid.Cid{}
 
@@ -171,12 +203,7 @@ func (u *UpdaterData) UpdateIfAppropriate(h host.Host) bool {
 				}
 			}
 
-			// Need at least 65 percent of keys to sign off on the message
-			// XXX: Replace this with an algorithm for integers. This might break for higher numbers
-
-			// balance := float64(highestTally) / float64(len(u.TrustedKeys))
-			// fmt.Println("Balance is: ", balance, highestTally, len(u.TrustedKeys))
-
+			// XXX: Make 100% sure this logic makes sense.
 			over51PercentThreshold := len(u.TrustedKeys)-highestTally < len(u.TrustedKeys)/2
 
 			if over51PercentThreshold {
@@ -189,7 +216,7 @@ func (u *UpdaterData) UpdateIfAppropriate(h host.Host) bool {
 					fmt.Println(err)
 				} else {
 					// We don't trust valid signatures with invalid CIDs.
-					// Though this should never run in practise since we check this earlier.
+					// Though this should never run in practice since we check this earlier.
 					isVerified = false
 				}
 			} else {
@@ -260,11 +287,12 @@ func (u *UpdaterData) UpdateIfAppropriate(h host.Host) bool {
 				return buf.Bytes(), nil
 			}
 
-			// Note(Tom): Need to specify this multiaddr because I need to connect so someone who is definitely seeding this CID.
+			// HACK: Need to specify this multiaddr because I need to connect so someone who is definitely seeding this CID.
 			buf, err := getFile(h, c, "/ip4/10.0.17.23/tcp/4001/p2p/12D3KooWPnX64ZDrYZof4cyJhAA9NK2Yxygs5C1uCS2zg5x1PbHL")
 
 			if err != nil {
 				fmt.Println(err)
+				return false
 			} else {
 				fmt.Println("Everything has passed")
 
@@ -276,14 +304,13 @@ func (u *UpdaterData) UpdateIfAppropriate(h host.Host) bool {
 
 				if err != nil {
 					fmt.Println("error launching new process: ", err)
+					return false
 				} else {
 					return true
 				}
 			}
 		}
 	}
-
-	return false
 }
 
 func NewHost() host.Host {
@@ -346,7 +373,7 @@ func referenceUsageDeleteLater() {
 		panic(err)
 	}
 
-	var updater UpdaterData
+	var updater UpdaterInstance
 	trusted_keys_base64 := []string{"JZlpAGC7aYXIupMUQN48daT/tYRulWiOC0sXFNEXFNE", "+8rZEcO928jPGlkn0CZKbXxi11twmZbj9KxxBvTa15Q"}
 	updater.TrustedKeys = make([]PublicKey, len(trusted_keys_base64))
 	updater.LatestVerifiedRequests = make([]UpdateRequest, len(trusted_keys_base64))
