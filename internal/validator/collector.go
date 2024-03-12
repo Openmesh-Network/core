@@ -77,7 +77,7 @@ func defaultJoinCEX(ctx context.Context, source Source, symbol string) (chan []b
 
 	msgChannel := make(chan []byte)
 	go func() {
-		// XXX: Move this goshforsaken allocation at some point (Maybe move to collector class?).
+		// XXX: Move this goshforsaken allocation at some point (Maybe move to global collector struct?).
 		// Also note that this means messages higher than 2048 bytes in length will be sent in 2 chunks over the channel.
 		buf := make([]byte, 2048)
 		for {
