@@ -25,6 +25,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/multiformats/go-multiaddr"
+	"openmesh.network/openmesh-core/internal/networking/p2p"
 
 	"github.com/ipfs/boxo/blockservice"
 	blockstore "github.com/ipfs/boxo/blockstore"
@@ -56,6 +57,7 @@ type UpdaterInstance struct {
 	TrustedKeys []PublicKey
 
 	LatestVerifiedRequests []UpdateRequest
+	P2pInstance            *p2p.Instance
 	// CurrentVersion         [32]byte // TODO: this should be passed as an argv to child process
 }
 
@@ -91,10 +93,11 @@ func PublicKeyFromBase64(base64KeyString string) PublicKey {
 	return publicKey
 }
 
-func NewInstance(trustedKeys []PublicKey) *UpdaterInstance {
+func NewInstance(trustedKeys []PublicKey, p2pInstance *p2p.Instance) *UpdaterInstance {
 	updater := UpdaterInstance{}
 	updater.TrustedKeys = trustedKeys
 	updater.LatestVerifiedRequests = make([]UpdateRequest, len(updater.TrustedKeys))
+	updater.P2pInstance = p2pInstance
 
 	return &updater
 }
@@ -127,7 +130,7 @@ func (u *UpdaterInstance) VerifyRequest(req UpdateRequest) bool {
 			} else {
 				// NOT VERIFIED
 				// TODO:Handle case where outdated message is still being received
-				fmt.Println("Outdated message.")
+				fmt.Println("Outdated message. Nonce local ", u.LatestVerifiedRequests[trustedIndex].Content.Nonce, req.Content.Nonce)
 				return false
 			}
 		} else {
@@ -204,20 +207,19 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 			}
 
 			// XXX: Make 100% sure this logic makes sense.
-			over51PercentThreshold := len(u.TrustedKeys)-highestTally < len(u.TrustedKeys)/2
-
+			over51PercentThreshold := float64(len(u.TrustedKeys)-highestTally) <= (float64(len(u.TrustedKeys)) / 2.0)
 			if over51PercentThreshold {
-				isVerified = true
-
 				var err error
 				c, err = cid.Cast(u.LatestVerifiedRequests[mostPopularCidIndex].Content.BinaryCid)
 
 				if err != nil {
-					fmt.Println(err)
-				} else {
 					// We don't trust valid signatures with invalid CIDs.
 					// Though this should never run in practice since we check this earlier.
 					isVerified = false
+					fmt.Println("Invalid CID.")
+					fmt.Println(err)
+				} else {
+					isVerified = true
 				}
 			} else {
 				// No one has a majority.
@@ -225,6 +227,7 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 				isVerified = false
 			}
 		} else {
+			fmt.Println("No CIDs.")
 			isVerified = false
 		}
 	}
@@ -440,4 +443,72 @@ func referenceUsageDeleteLater() {
 			}
 		}
 	}
+}
+
+func (updater *UpdaterInstance) Start(ctx context.Context) {
+
+	fmt.Println("Updater listening on address: ", HostToString(*updater.P2pInstance.Host))
+
+	// TODO: This needs to get the file from an actual IPFS network
+	err := updater.P2pInstance.JoinTopic("openmesh-core-update")
+	if err != nil {
+		panic(err)
+	}
+
+	subscription, err := updater.P2pInstance.Subscribe("openmesh-core-update")
+	if err != nil {
+		panic(err)
+	}
+
+	// Check peers and log.
+	// go func() {
+	// 	ticker := time.NewTicker(time.Millisecond * 100)
+	// 	peer_count_last := h.Peerstore().Peers().Len()
+	// 	for {
+	// 		select {
+	// 		case <-ctx.Done():
+	// 			break
+	// 		case <-ticker.C:
+	// 			peer_count := h.Peerstore().Peers().Len()
+	// 			if peer_count_last < peer_count {
+	// 				fmt.Println("Changed peers had:", peer_count_last, "now:", peer_count)
+	// 				peer_count_last = peer_count
+	// 			}
+	// 		}
+	// 	}
+	// }()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				break
+			default:
+				fmt.Println("Waiting for message.")
+
+				message := <-subscription
+				fmt.Println("Got message.")
+				if err != nil {
+					fmt.Println(err)
+				}
+				fmt.Println(message)
+
+				var request_buffer bytes.Buffer
+				request_buffer.Write(message.Data)
+				decoder := gob.NewDecoder(&request_buffer)
+
+				var request UpdateRequest
+				decoder.Decode(&request)
+
+				fmt.Println(message.Data)
+				fmt.Println(request)
+
+				updater.VerifyRequest(request)
+				if updater.UpdateIfAppropriate(*updater.P2pInstance.Host) {
+					fmt.Println("Success, spawned child process! Updater is finished.")
+					os.Exit(0)
+				}
+			}
+		}
+	}()
 }

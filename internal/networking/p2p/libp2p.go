@@ -22,7 +22,7 @@ import (
 // Instance is the libp2p instance for networking usage.
 type Instance struct {
 	cancelCtx context.Context
-	host      *host.Host     // Host for libp2p.
+	Host      *host.Host     // Host for libp2p.
 	DHT       *dht.IpfsDHT   // Kademlia DHT for resource locating.
 	Discovery *PeerDiscovery // mDNS peer discovery instance.
 
@@ -46,7 +46,7 @@ func NewInstance(c context.Context) *Instance {
 
 // SetP2PHost uses an existing libp2p host to initialise the instance.
 func (i *Instance) SetP2PHost(existingHost *host.Host) *Instance {
-	i.host = existingHost
+	i.Host = existingHost
 	return i
 }
 
@@ -55,8 +55,8 @@ func (i *Instance) Build() (*Instance, error) {
 	var err error
 
 	// Initialise a default libp2p host if not present.
-	if i.host == nil {
-		i.host, err = NewDefaultP2PHost()
+	if i.Host == nil {
+		i.Host, err = NewDefaultP2PHost()
 
 		if err != nil {
 			return i, err
@@ -64,7 +64,7 @@ func (i *Instance) Build() (*Instance, error) {
 	}
 
 	// Initialise Kademlia DHT instance.
-	i.DHT, err = dht.New(context.Background(), *i.host, dht.Mode(dht.ModeAutoServer))
+	i.DHT, err = dht.New(context.Background(), *i.Host, dht.Mode(dht.ModeAutoServer))
 	i.DHT.Validator = NewDHTValidator()
 	if err != nil {
 		log.Fatalf("Failed to create Kademlia DHT: %s", err.Error())
@@ -74,17 +74,17 @@ func (i *Instance) Build() (*Instance, error) {
 	if i.Discovery == nil {
 		i.Discovery = NewPeerDiscovery()
 	}
-	mdnsSrv := mdns.NewMdnsService(*i.host, config.Config.P2P.GroupName, i.Discovery)
+	mdnsSrv := mdns.NewMdnsService(*i.Host, config.Config.P2P.GroupName, i.Discovery)
 	i.startMDNS = mdnsSrv.Start
 	i.closeMDNS = mdnsSrv.Close
 
 	// Initialise Gossip pub-sub
-	i.PubSub, err = pubsub.NewGossipSub(context.Background(), *i.host)
+	i.PubSub, err = pubsub.NewGossipSub(context.Background(), *i.Host)
 	if err != nil {
 		log.Fatalf("Failed to create Gossip pub-sub service: %s", err.Error())
 	}
 
-	log.Printf("Successfully initialised a libp2p instance with ID %s", (*i.host).ID())
+	log.Printf("Successfully initialised a libp2p instance with ID %s", (*i.Host).ID())
 	return i, nil
 }
 
@@ -116,7 +116,7 @@ func (i *Instance) Stop() error {
 	if err := i.closeMDNS(); err != nil {
 		return err
 	}
-	if err := (*i.host).Close(); err != nil {
+	if err := (*i.Host).Close(); err != nil {
 		return err
 	}
 
@@ -183,7 +183,7 @@ func (i *Instance) waitMsg(handle *pubsub.Subscription, ch chan<- *pubsub.Messag
 		}
 
 		// Only consider messages delivered by other peers
-		if msg.ReceivedFrom == (*i.host).ID() {
+		if msg.ReceivedFrom == (*i.Host).ID() {
 			continue
 		}
 		// Handle it over via channel
@@ -212,7 +212,7 @@ func (i *Instance) connectToNewPeer(ctx context.Context) {
 
 			// Otherwise connect to this peer
 			i.peersLock.Unlock()
-			err := (*i.host).Connect(context.Background(), p)
+			err := (*i.Host).Connect(context.Background(), p)
 			if err != nil {
 				log.Printf("Failed to connect to peer %s: %s", p.ID, err.Error())
 				log.Printf("Start retry to connect to peer...")
@@ -234,7 +234,7 @@ func (i *Instance) tryConnect(cnt int, p peer.AddrInfo) {
 	for cnt > 0 {
 		select {
 		case <-t.C:
-			err := (*i.host).Connect(context.Background(), p)
+			err := (*i.Host).Connect(context.Background(), p)
 			if err != nil {
 				log.Printf("Failed to connect to peer %s: %s, retry after 5 seconds...", p.ID, err.Error())
 				continue

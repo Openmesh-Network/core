@@ -15,7 +15,7 @@ import (
 var TrustedKeys = []updater.PublicKey{
 	// XXX: THESE ARE NOT THE FINAL KEYS, CHANGE BEFORE DEPLOYING TO PRODUCTION!!!
 	updater.PublicKeyFromBase64("JZlpAGC7aYXIupMUQN48daT/tYRulWiOC0sXFNEXFNE"),
-	updater.PublicKeyFromBase64("+8rZEcO928jPGlkn0CZKbXxi11twmZbj9KxxBvTa15Q"),
+	// updater.PublicKeyFromBase64("+8rZEcO928jPGlkn0CZKbXxi11twmZbj9KxxBvTa15Q"),
 }
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 
 	// Run the updater.
 	// TODO: Maybe pass past CID versions to avoid redownloading old updates.
-	updater.NewInstance(TrustedKeys)
+	updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
 
 	// Build and start top-level instance.
 	core.NewInstance().SetP2pInstance(p2pInstance).Start()
