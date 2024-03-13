@@ -12,6 +12,7 @@ import (
 	"syscall"
 )
 
+// These are the public keys trusted to sign new updates.
 var TrustedKeys = []updater.PublicKey{
 	// XXX: THESE ARE NOT THE FINAL KEYS, CHANGE BEFORE DEPLOYING TO PRODUCTION!!!
 	updater.PublicKeyFromBase64("JZlpAGC7aYXIupMUQN48daT/tYRulWiOC0sXFNEXFNE"),

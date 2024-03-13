@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"io"
 
@@ -103,6 +104,7 @@ func NewInstance(trustedKeys []PublicKey, p2pInstance *p2p.Instance) *UpdaterIns
 }
 
 func (u *UpdaterInstance) VerifyRequest(req UpdateRequest) bool {
+	// This matches the request's key to the list of public keys.
 	trustedIndex := -1
 	for i, tk := range u.TrustedKeys {
 		if bytes.Equal(tk[:], req.PublicKey[:]) {
@@ -111,7 +113,8 @@ func (u *UpdaterInstance) VerifyRequest(req UpdateRequest) bool {
 		}
 	}
 
-	fmt.Println("Trusted index: ", trustedIndex)
+	// NOTE: Harry maybe uncomment this for debugging.
+	// fmt.Println("Trusted index: ", trustedIndex)
 
 	if trustedIndex >= 0 {
 		// Verify hash and signature independently.
@@ -119,6 +122,7 @@ func (u *UpdaterInstance) VerifyRequest(req UpdateRequest) bool {
 		verified := ed25519.Verify(req.PublicKey[:], hashBytes, req.Signature[:])
 
 		if verified {
+			// NOTE: Harry maybe uncomment this for debugging.
 			// fmt.Println("Trusted index: ", trustedIndex)
 			// fmt.Println("LatestVerifiedRequests: ", u.LatestVerifiedRequests)
 
@@ -147,6 +151,26 @@ func (u *UpdaterInstance) VerifyRequest(req UpdateRequest) bool {
 	}
 }
 
+// TODO: Move this somewhere more appropriate
+func ConnectToMultiaddr(ctx context.Context, h host.Host, targetPeer string) error {
+	maddr, err := multiaddr.NewMultiaddr(targetPeer)
+	if err != nil {
+		return err
+	}
+
+	info, err := peer.AddrInfoFromP2pAddr(maddr)
+	if err != nil {
+		return err
+	}
+
+	err = h.Connect(ctx, *info)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 	isVerified := false
 	c := cid.Cid{}
@@ -159,7 +183,6 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 			for ci, r := range u.LatestVerifiedRequests {
 				// Nonce 0 is not a valid request.
 				if r.Content.Nonce > 0 {
-
 					// Only proceed if the CID is valid!
 					_, parseError := cid.Parse(r.Content.BinaryCid)
 					if parseError == nil {
@@ -206,8 +229,10 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 				}
 			}
 
-			// XXX: Make 100% sure this logic makes sense.
-			over51PercentThreshold := float64(len(u.TrustedKeys)-highestTally) <= (float64(len(u.TrustedKeys)) / 2.0)
+			// XXX: Make 100% sure this logic makes sense:
+			// Want #ValidSignatures >= #Keys * 2/3 to be true for 66% concensus.
+			// So it simplifies to 3 * #ValidSignatures >= 2 * #Keys.
+			over51PercentThreshold := len(u.TrustedKeys)*2 <= highestTally*3
 			if over51PercentThreshold {
 				var err error
 				c, err = cid.Cast(u.LatestVerifiedRequests[mostPopularCidIndex].Content.BinaryCid)
@@ -239,78 +264,74 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 
 	fmt.Println("Downloading cid...")
 	{ // Download the cid.
+		// TODO: Maybe take ctx as a parameter.
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-		/* TODO: need to integrate this with existing networking code in core maybe?
-		   might be better to leave this decoupled actually.
-		   Problem with doing it this way is that it won't benefit from whatever routing we end up doing.
-		*/
+		getFile := func(h host.Host, c cid.Cid) ([]byte, error) {
+			n := bsnet.NewFromIpfsHost(h, routinghelpers.Null{})
+			bswap := bsclient.New(ctx, n, blockstore.NewBlockstore(datastore.NewNullDatastore()))
+			n.Start(bswap)
+			defer bswap.Close()
 
-		{ // Silly ipfs stuff.
+			// I could write a novel on how bad this API is. But whatever, we have to disconnect
+			// and reconnect to our peers if we want them to be actually "registered" by bsnet.
+			for _, peerId := range h.Network().Peers() {
+				// XXX: Find a good timeout for reconnecting to old peers. Also find if there's a better way to handle this bitswap issue.
+				ctx, cancel := context.WithTimeout(ctx, time.Second*1)
+				defer cancel()
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			getFile := func(h host.Host, c cid.Cid, targetPeer string) ([]byte, error) {
-				n := bsnet.NewFromIpfsHost(h, routinghelpers.Null{})
-				bswap := bsclient.New(ctx, n, blockstore.NewBlockstore(datastore.NewNullDatastore()))
-				n.Start(bswap)
-				defer bswap.Close()
-
-				maddr, err := multiaddr.NewMultiaddr(targetPeer)
+				fmt.Println("Connecting to:", peerId)
+				err := n.DisconnectFrom(ctx, peerId)
 				if err != nil {
-					return nil, err
+					panic(err)
 				}
 
-				info, err := peer.AddrInfoFromP2pAddr(maddr)
+				err = n.ConnectTo(ctx, peerId)
 				if err != nil {
-					return nil, err
+					panic(err)
 				}
-
-				if err := h.Connect(ctx, *info); err != nil {
-					return nil, err
-				}
-
-				dserv := merkledag.NewReadOnlyDagService(merkledag.NewSession(ctx, merkledag.NewDAGService(blockservice.New(blockstore.NewBlockstore(datastore.NewNullDatastore()), bswap))))
-				nd, err := dserv.Get(ctx, c)
-				if err != nil {
-					return nil, err
-				}
-
-				unixFSNode, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
-				if err != nil {
-					return nil, err
-				}
-
-				var buf bytes.Buffer
-				if f, ok := unixFSNode.(files.File); ok {
-					if _, err := io.Copy(&buf, f); err != nil {
-						return nil, err
-					}
-				}
-				return buf.Bytes(), nil
 			}
 
-			// HACK: Need to specify this multiaddr because I need to connect so someone who is definitely seeding this CID.
-			buf, err := getFile(h, c, "/ip4/10.0.17.23/tcp/4001/p2p/12D3KooWPnX64ZDrYZof4cyJhAA9NK2Yxygs5C1uCS2zg5x1PbHL")
+			dserv := merkledag.NewReadOnlyDagService(merkledag.NewSession(ctx, merkledag.NewDAGService(blockservice.New(blockstore.NewBlockstore(datastore.NewNullDatastore()), bswap))))
+			nd, err := dserv.Get(ctx, c)
+			if err != nil {
+				return nil, err
+			}
+
+			unixFSNode, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
+			if err != nil {
+				return nil, err
+			}
+
+			var buf bytes.Buffer
+			if f, ok := unixFSNode.(files.File); ok {
+				if _, err := io.Copy(&buf, f); err != nil {
+					return nil, err
+				}
+			}
+			return buf.Bytes(), nil
+		}
+
+		buf, err := getFile(h, c)
+
+		if err != nil {
+			fmt.Println(err)
+			return false
+		} else {
+			fmt.Println("Everything has passed")
+
+			// XXX: Think about more sensible permissions maybe. Shouldn't matter if it's running in a container 🤷.
+			os.WriteFile("executable-file", buf, 0o777)
+
+			var attr os.ProcAttr
+			_, err := os.StartProcess("executable-file", []string{"executable-file", "wazzup"}, &attr)
 
 			if err != nil {
-				fmt.Println(err)
+				fmt.Println("error launching new process: ", err)
 				return false
 			} else {
-				fmt.Println("Everything has passed")
-
-				// XXX: think about more sensible permissions maybe
-				os.WriteFile("executable-file", buf, 0o777)
-
-				var attr os.ProcAttr
-				_, err := os.StartProcess("executable-file", []string{"executable-file", "wazzup"}, &attr)
-
-				if err != nil {
-					fmt.Println("error launching new process: ", err)
-					return false
-				} else {
-					return true
-				}
+				return true
 			}
 		}
 	}
@@ -446,37 +467,20 @@ func referenceUsageDeleteLater() {
 }
 
 func (updater *UpdaterInstance) Start(ctx context.Context) {
-
 	fmt.Println("Updater listening on address: ", HostToString(*updater.P2pInstance.Host))
 
 	// TODO: This needs to get the file from an actual IPFS network
 	err := updater.P2pInstance.JoinTopic("openmesh-core-update")
 	if err != nil {
+		// HACK: Handle this sensibly.
 		panic(err)
 	}
 
 	subscription, err := updater.P2pInstance.Subscribe("openmesh-core-update")
 	if err != nil {
+		// HACK: Handle this sensibly.
 		panic(err)
 	}
-
-	// Check peers and log.
-	// go func() {
-	// 	ticker := time.NewTicker(time.Millisecond * 100)
-	// 	peer_count_last := h.Peerstore().Peers().Len()
-	// 	for {
-	// 		select {
-	// 		case <-ctx.Done():
-	// 			break
-	// 		case <-ticker.C:
-	// 			peer_count := h.Peerstore().Peers().Len()
-	// 			if peer_count_last < peer_count {
-	// 				fmt.Println("Changed peers had:", peer_count_last, "now:", peer_count)
-	// 				peer_count_last = peer_count
-	// 			}
-	// 		}
-	// 	}
-	// }()
 
 	go func() {
 		for {

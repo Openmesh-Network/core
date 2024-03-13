@@ -1,10 +1,18 @@
-package validator
+package main
 
 import (
+	"bytes"
+	"fmt"
+	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 // TODO: Check which exchanges are wanted / desireable. Also, find which symbols we should care about.
@@ -28,15 +36,15 @@ var Sources = [...]Source{
 	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{symbol}}\" ], \"channels\": [ \"ticker\" ]}"},
 	{"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{symbol}}\", \"channel\": \"v3_trades\"}"},
 
-	// Blockchains:
-	// {"ethereum", "", nil, []string{}},
+	// Blockchain RPCs:
+	{"ethereum-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/eth", []string{""}, ""},
 }
 
 // Subscribe will connect to the chosen source and create a channel to get data out of it.
 func Subscribe(ctx context.Context, source Source, symbol string, bufferSizeMax int) (chan []byte, error) {
 	// TODO: Not sure if it's better to use a shared buffer here instead of a channel.
 	// That would let us do custom compression behaviour at the exchange level.
-	// Thought maybe a ringbuffer would be appropriate..
+	// If we move to a buffer, using a ring/circular buffer sounds like a good idea.
 
 	msgChannel, err := source.JoinFunc(ctx, source, symbol)
 	if err != nil {
@@ -70,7 +78,7 @@ func defaultJoinCEX(ctx context.Context, source Source, symbol string) (chan []b
 		panic(err)
 	}
 
-	// HACK: This is the simplest tool for the job right now. It still feels wrong though.
+	// HACK: This is the simplest tool for the job right now. Importing a whole templating library is 100% overkill.
 	request := strings.Replace(source.Request, "{{symbol}}", symbol, 1)
 
 	ws.Write([]byte(request))
@@ -99,4 +107,79 @@ func defaultJoinCEX(ctx context.Context, source Source, symbol string) (chan []b
 	}()
 
 	return msgChannel, nil
+}
+
+func ankrJoinRPC(ctx context.Context, source Source, symbol string) (chan []byte, error) {
+	// Note that ankr has a 30requests / second guarantee. We can't spam their endpoint more than that.
+	// Plus they have a hard limit on the request body size.
+
+	fmt.Println("Dialing...")
+	ethereum_client, err := ethclient.Dial(source.ApiURL)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println("Dialed!")
+
+	msgChannel := make(chan []byte)
+	go func() {
+		buffer := bytes.NewBuffer(make([]byte, 1024000))
+		headerPrevious := common.Hash{}
+
+		for {
+			fmt.Println("Waiting for block...")
+			block, err := ethereum_client.BlockByNumber(ctx, nil)
+			fmt.Println("Got block!")
+
+			if err != nil {
+				// HACK: Lazy error handling, actually fix this.
+				panic(err)
+			} else {
+				headerProspective := block.Header().Hash()
+				if headerPrevious == headerProspective {
+					// Same block as last time we checked, ignore.
+				} else {
+					// Serialize the block in RLP format.
+					fmt.Println("Serializing block...")
+					buffer.Reset()
+					headerPrevious = block.Header().Hash()
+					err := block.EncodeRLP(buffer)
+					fmt.Println("Block serialized!")
+
+					if err != nil {
+						// HACK: Lazy error handling, actually fix this.
+						panic(err)
+					} else {
+						fmt.Println("Sending over channel,", buffer.Len())
+
+						msgChannel <- buffer.Bytes()
+
+						fmt.Println("Sent.")
+					}
+				}
+				time.Sleep(1 * time.Second)
+			}
+		}
+	}()
+
+	return msgChannel, nil
+}
+
+// XXX: Just for testing, remove later
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	c, err := ankrJoinRPC(ctx, Sources[3], Sources[3].Symbols[0])
+	f, err := os.Create("eth-size.log")
+
+	if err != nil {
+		panic(err)
+	} else {
+		for {
+			// fmt.Println(string(<-c))
+			b := <-c
+			f.Write([]byte(strconv.Itoa(len(b)) + "\n"))
+		}
+		cancel()
+	}
 }
