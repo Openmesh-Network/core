@@ -1,10 +1,8 @@
-package main
+package validator
 
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -162,24 +160,4 @@ func ankrJoinRPC(ctx context.Context, source Source, symbol string) (chan []byte
 	}()
 
 	return msgChannel, nil
-}
-
-// XXX: Just for testing, remove later
-func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	c, err := ankrJoinRPC(ctx, Sources[3], Sources[3].Symbols[0])
-	f, err := os.Create("eth-size.log")
-
-	if err != nil {
-		panic(err)
-	} else {
-		for {
-			// fmt.Println(string(<-c))
-			b := <-c
-			f.Write([]byte(strconv.Itoa(len(b)) + "\n"))
-		}
-		cancel()
-	}
 }
