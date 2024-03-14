@@ -5,3 +5,5 @@ p2p:
   port: 0
   groupName: xnode
   peerLimit: 50
+log:
+  development: true

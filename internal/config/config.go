@@ -12,6 +12,7 @@ var Config config
 // config is the configuration structure for the whole Openmesh Core project
 type config struct {
     P2P P2pConfig `yaml:"p2p"`
+    Log LogConfig `yaml:"log"`
 }
 
 // P2pConfig is the configuration for libp2p-related instances
@@ -20,6 +21,11 @@ type P2pConfig struct {
     Port      int    `yaml:"port"`      // libp2p listening port
     GroupName string `yaml:"groupName"` // Name used for discovering nodes via mDNS
     PeerLimit int    `yaml:"peerLimit"` // Max number of peers this node can establish connection to
+}
+
+// LogConfig is the configuration for zap logger
+type LogConfig struct {
+    Development bool `yaml:"development"` // Development logger has DEBUG level and is more human-friendly
 }
 
 // ParseConfig parses the yml configuration file and initialise the Config variable
