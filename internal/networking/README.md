@@ -10,7 +10,7 @@ This is the library implemented P2P networking based on `libp2p`.
 
 ```go
 // Construct and start a p2p instance
-ins, err := p2p.NewInstance(cancelContext).Build()
+ins, err := p2p.NewInstance(cancelContext).SetP2PHost(existingHost).Build()
 err = ins.Start()
 ```
 
