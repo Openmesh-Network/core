@@ -2,7 +2,6 @@ package main
 
 import (
     "context"
-    "log"
     "openmesh.network/openmesh-core/internal/config"
     "openmesh.network/openmesh-core/internal/core"
     "openmesh.network/openmesh-core/internal/logger"
@@ -35,7 +34,7 @@ func main() {
     // Initialise p2p instance.
     p2pInstance, err := p2p.NewInstance(cancelCtx).Build()
     if err != nil {
-        log.Fatalf("Failed to initialise p2p instance: %s", err.Error())
+        logger.Fatalf("Failed to initialise p2p instance: %s", err.Error())
     }
 
     // Run the updater.
@@ -43,12 +42,14 @@ func main() {
     updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
 
     // Build and start top-level instance.
-    core.NewInstance().SetP2pInstance(p2pInstance).Start()
+    ins := core.NewInstance().SetP2pInstance(p2pInstance)
+    ins.Start()
 
     sigChan := make(chan os.Signal, 1)
     signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 
     // Stop here!
     sig := <-sigChan
-    log.Printf("Termination signal received: %v", sig)
+    logger.Infof("Termination signal received: %v", sig)
+    ins.Stop()
 }
