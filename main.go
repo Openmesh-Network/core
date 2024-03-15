@@ -4,6 +4,7 @@ import (
     "context"
     "openmesh.network/openmesh-core/internal/config"
     "openmesh.network/openmesh-core/internal/core"
+    "openmesh.network/openmesh-core/internal/database"
     "openmesh.network/openmesh-core/internal/logger"
     "openmesh.network/openmesh-core/internal/networking/p2p"
     "openmesh.network/openmesh-core/internal/updater"
@@ -37,13 +38,19 @@ func main() {
         logger.Fatalf("Failed to initialise p2p instance: %s", err.Error())
     }
 
+    // Initialise PostgreSQL connection
+    dbInstance := database.NewInstance()
+
     // Run the updater.
     // TODO: Maybe pass past CID versions to avoid redownloading old updates.
     updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
 
     // Build and start top-level instance.
-    ins := core.NewInstance().SetP2pInstance(p2pInstance)
+    ins := core.NewInstance().
+        SetP2pInstance(p2pInstance).
+        SetDBInstance(dbInstance)
     ins.Start()
+    defer ins.Stop()
 
     sigChan := make(chan os.Signal, 1)
     signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
@@ -51,5 +58,4 @@ func main() {
     // Stop here!
     sig := <-sigChan
     logger.Infof("Termination signal received: %v", sig)
-    ins.Stop()
 }

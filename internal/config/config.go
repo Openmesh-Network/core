@@ -13,6 +13,7 @@ var Config config
 type config struct {
     P2P P2pConfig `yaml:"p2p"`
     Log LogConfig `yaml:"log"`
+    DB  DBConfig  `yaml:"db"`
 }
 
 // P2pConfig is the configuration for libp2p-related instances
@@ -21,6 +22,15 @@ type P2pConfig struct {
     Port      int    `yaml:"port"`      // libp2p listening port
     GroupName string `yaml:"groupName"` // Name used for discovering nodes via mDNS
     PeerLimit int    `yaml:"peerLimit"` // Max number of peers this node can establish connection to
+}
+
+// DBConfig is the configuration for database connection and operation
+type DBConfig struct {
+    Username string `yaml:"username"` // Username for the specific database to be connected
+    Password string `yaml:"password"` // Password for the specific database to be connected
+    Port     int    `yaml:"port"`     // Database connection port
+    DBName   string `yaml:"dbName"`   // Name for the database used
+    URL      string `yaml:"URL"`      // Database connection URL
 }
 
 // LogConfig is the configuration for zap logger
