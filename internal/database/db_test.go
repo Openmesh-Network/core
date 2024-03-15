@@ -23,10 +23,11 @@ func TestNewInstance(t *testing.T) {
     setup()
     defer teardown()
 
-    ins := NewInstance()
-    err := ins.Start()
+    ins, err := NewInstance()
     if ins.Conn != nil {
         defer ins.Stop()
     }
+    assert.NoError(t, err)
+    err = ins.Start()
     assert.NoError(t, err)
 }

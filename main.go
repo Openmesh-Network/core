@@ -2,6 +2,7 @@ package main
 
 import (
     "context"
+    "openmesh.network/openmesh-core/internal/bft"
     "openmesh.network/openmesh-core/internal/config"
     "openmesh.network/openmesh-core/internal/core"
     "openmesh.network/openmesh-core/internal/database"
@@ -39,7 +40,16 @@ func main() {
     }
 
     // Initialise PostgreSQL connection
-    dbInstance := database.NewInstance()
+    dbInstance, err := database.NewInstance()
+    if err != nil {
+        logger.Fatalf("Failed to establish PostgreSQL connection: %s", err.Error())
+    }
+
+    // Initialise CometBFT instance
+    bftInstance, err := bft.NewInstance(dbInstance.Conn)
+    if err != nil {
+        logger.Fatalf("Failed to initialise CometBFT instance: %s", err.Error())
+    }
 
     // Run the updater.
     // TODO: Maybe pass past CID versions to avoid redownloading old updates.
@@ -48,8 +58,10 @@ func main() {
     // Build and start top-level instance.
     ins := core.NewInstance().
         SetP2pInstance(p2pInstance).
-        SetDBInstance(dbInstance)
+        SetDBInstance(dbInstance).
+        SetBFTInstance(bftInstance)
     ins.Start()
+    logger.Infof("Openmesh Core started successfully.")
     defer ins.Stop()
 
     sigChan := make(chan os.Signal, 1)

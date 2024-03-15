@@ -1,0 +1,40 @@
+syntax = "proto3";
+option go_package = "openmesh.network/openmesh-core/internal/bft/types";
+
+enum TransactionType {
+  NormalTransaction = 0;
+  VerificationTransaction = 1;
+  ResourceTransaction = 2;
+}
+
+message VerificationTransactionData {
+  string attestation = 1;
+  string cid = 2;
+  string datasource = 3;
+  int64 timestamp = 4;
+}
+
+
+message ResourceTransactionData {
+  double total_resources = 1;
+  double rewarded_resources = 2;
+}
+
+
+message NormalTransactionData {
+  double transaction_amount = 1;
+  string sent_to = 2;
+}
+
+
+message Transaction {
+  string owner = 1;
+  string signature = 2;
+  TransactionType type = 3;
+  oneof data {
+    bytes raw_data = 5;
+    VerificationTransactionData verification_data = 6;
+    ResourceTransactionData resource_data = 7;
+    NormalTransactionData normal_data = 8;
+  }
+}

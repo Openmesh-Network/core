@@ -26,12 +26,8 @@ type Instance struct {
     Conn *sql.DB
 }
 
-func NewInstance() *Instance {
-    return &Instance{}
-}
-
-// Start establish the connection to PostgreSQL and fill in the Conn field in the instance
-func (i *Instance) Start() error {
+func NewInstance() (*Instance, error) {
+    i := &Instance{}
     conf := config.Config.DB
     connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
         conf.URL, conf.Port, conf.Username, conf.Password, conf.DBName)
@@ -39,7 +35,7 @@ func (i *Instance) Start() error {
     // Initialise PostgreSQL connection
     conn, err := sql.Open("postgres", connStr)
     if err != nil {
-        return err
+        return nil, err
     }
     i.Conn = conn
 
@@ -48,13 +44,19 @@ func (i *Instance) Start() error {
     defer cancel()
     if err := conn.PingContext(timeoutCtx); err != nil {
         defer conn.Close()
-        return err
+        return nil, err
     }
+    i.Conn = conn
     logger.Infof("Successfully connected to PostgreSQL at %s@%s:%d", conf.DBName, conf.URL, conf.Port)
 
+    return i, nil
+}
+
+// Start establish the connection to PostgreSQL and fill in the Conn field in the instance
+func (i *Instance) Start() error {
     // Create nodemeta table if it not exists
     if err := i.CreateNodeMetaTable(); err != nil {
-        defer conn.Close()
+        defer i.Conn.Close()
         return err
     }
     logger.Debugf("Successfully created table 'nodemeta' or it already exists")

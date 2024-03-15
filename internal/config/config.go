@@ -12,6 +12,7 @@ var Config config
 // config is the configuration structure for the whole Openmesh Core project
 type config struct {
     P2P P2pConfig `yaml:"p2p"`
+    BFT BFTConfig `yaml:"bft"`
     Log LogConfig `yaml:"log"`
     DB  DBConfig  `yaml:"db"`
 }
@@ -31,6 +32,11 @@ type DBConfig struct {
     Port     int    `yaml:"port"`     // Database connection port
     DBName   string `yaml:"dbName"`   // Name for the database used
     URL      string `yaml:"URL"`      // Database connection URL
+}
+
+// BFTConfig is the configuration for using CometBFT
+type BFTConfig struct {
+    HomeDir string `yaml:"homeDir"` // Path to CometBFT config
 }
 
 // LogConfig is the configuration for zap logger
