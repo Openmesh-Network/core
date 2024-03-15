@@ -61,14 +61,15 @@ type ErrorLogConfig struct {
 
 // ParseConfig parses the yml configuration file and initialise the Config variable
 func ParseConfig() {
-    viper.AddConfigPath(Path)
-    viper.SetConfigName(Name)
-    viper.SetConfigType("yaml")
+    coreConf := viper.New()
+    coreConf.AddConfigPath(Path)
+    coreConf.SetConfigName(Name)
+    coreConf.SetConfigType("yaml")
 
-    if err := viper.ReadInConfig(); err != nil {
+    if err := coreConf.ReadInConfig(); err != nil {
         log.Fatalf("Failed to read the configuration: %s", err.Error())
     }
-    if err := viper.Unmarshal(&Config); err != nil {
+    if err := coreConf.Unmarshal(&Config); err != nil {
         log.Fatalf("Failed to parse the configuration: %s", err.Error())
     }
 }
