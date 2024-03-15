@@ -15,8 +15,11 @@ import (
 // These are the public keys trusted to sign new updates.
 var TrustedKeys = []updater.PublicKey{
 	// XXX: THESE ARE NOT THE FINAL KEYS, CHANGE BEFORE DEPLOYING TO PRODUCTION!!!
-	updater.PublicKeyFromBase64("JZlpAGC7aYXIupMUQN48daT/tYRulWiOC0sXFNEXFNE"),
+	updater.PublicKeyFromBase64("em9//dXGUM4iQR348WqHmNtvin0HYkLQQCOqbufssbA"),
+	// updater.PublicKeyFromBase64("jt1/Mb2xWnd7z6pn21iTb9EU4wycdZhT6Zgb3xf+h6k"),
 	// updater.PublicKeyFromBase64("+8rZEcO928jPGlkn0CZKbXxi11twmZbj9KxxBvTa15Q"),
+	// Fake key
+	// updater.PublicKeyFromBase64("JZlpAGC7aYXIupMUQN48daT/tYRulWiOC0sXFNEXFNE"),
 }
 
 func main() {

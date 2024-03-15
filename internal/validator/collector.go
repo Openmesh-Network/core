@@ -103,7 +103,6 @@ func defaultJoinCEX(ctx context.Context, source Source, symbol string) (chan []b
 		// Closing the websocket here should end the other goroutine.
 		ws.Close()
 	}()
-
 	return msgChannel, nil
 }
 
