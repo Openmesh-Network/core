@@ -7,3 +7,18 @@ p2p:
   peerLimit: 50
 log:
   development: true
+  encoding: console
+  info:
+    toStdout: true
+    toFile: true
+    fileName: logs/core-info.log
+    maxSize: 10
+    maxAge: 7
+    maxBackups: 10
+  error:
+    toStderr: true
+    toFile: true
+    fileName: logs/core-error.log
+    maxSize: 10
+    maxAge: 7
+    maxBackups: 10

@@ -2,10 +2,14 @@ package logger
 
 import (
     "go.uber.org/zap"
+    "go.uber.org/zap/zapcore"
+    "gopkg.in/natefinch/lumberjack.v2"
     "openmesh.network/openmesh-core/internal/config"
+    "os"
 )
 
 var (
+    syncs    []func() error
     Debug    func(...interface{})
     Debugf   func(string, ...interface{})
     Debugw   func(string, ...interface{})
@@ -38,10 +42,58 @@ var (
 
 // InitLogger initialise a logger and assign it to the global variables
 func InitLogger() {
-    logger := zap.Must(zap.NewProduction())
+    stdout := zapcore.AddSync(os.Stdout)
+    infoLevel := zap.NewAtomicLevelAt(zap.InfoLevel)
+    infoConfig := config.Config.Log.InfoConfig
+    infoFile := zapcore.AddSync(&lumberjack.Logger{
+        Filename:   infoConfig.FileName,
+        MaxSize:    infoConfig.MaxSize,
+        MaxAge:     infoConfig.MaxAge,
+        MaxBackups: infoConfig.MaxBackups,
+        LocalTime:  true,
+    })
+
+    stderr := zapcore.AddSync(os.Stderr)
+    errLevel := zap.NewAtomicLevelAt(zap.ErrorLevel)
+    errConfig := config.Config.Log.ErrorConfig
+    errFile := zapcore.AddSync(&lumberjack.Logger{
+        Filename:   errConfig.FileName,
+        MaxSize:    errConfig.MaxSize,
+        MaxAge:     errConfig.MaxAge,
+        MaxBackups: errConfig.MaxBackups,
+        LocalTime:  true,
+    })
+
+    // Initialise log config based on development/production config
+    cfg := zap.NewProductionEncoderConfig()
+    cfg.TimeKey = "timestamp"
+    cfg.EncodeTime = zapcore.ISO8601TimeEncoder
     if config.Config.Log.Development {
-        logger = zap.Must(zap.NewDevelopment())
+        cfg = zap.NewDevelopmentEncoderConfig()
+        cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
     }
+    encoder := getEncoder(config.Config.Log.Encoding, cfg)
+
+    // Add log configs to the core based on the configuration provided
+    cores := make([]zapcore.Core, 0)
+    if infoConfig.ToFile {
+        cores = append(cores, zapcore.NewCore(encoder, infoFile, infoLevel))
+        syncs = append(syncs, infoFile.Sync)
+    }
+    if infoConfig.ToStdout {
+        cores = append(cores, zapcore.NewCore(encoder, stdout, infoLevel))
+    }
+    if errConfig.ToFile {
+        cores = append(cores, zapcore.NewCore(encoder, errFile, errLevel))
+        syncs = append(syncs, errFile.Sync)
+    }
+    if errConfig.ToStderr {
+        cores = append(cores, zapcore.NewCore(encoder, stderr, errLevel))
+    }
+
+    // Initialise Zap logger
+    core := zapcore.NewTee(cores...)
+    logger := zap.New(core)
     zap.ReplaceGlobals(logger)
 
     // Convert it to a sugared logger to use something like Infof() and Info()
@@ -89,4 +141,27 @@ func InitLogger() {
     Fatalf = sugar.Fatalf
     Fatalw = sugar.Fatalw
     Fatalln = sugar.Fatalln
+}
+
+// SyncAll sync all the files added to the logger
+func SyncAll() error {
+    for _, sync := range syncs {
+        err := sync()
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+// getEncoder create and return a proper encoder based on the format specified
+func getEncoder(format string, c zapcore.EncoderConfig) zapcore.Encoder {
+    switch format {
+    case "json":
+        return zapcore.NewJSONEncoder(c)
+    case "console":
+        return zapcore.NewConsoleEncoder(c)
+    default:
+        return zapcore.NewJSONEncoder(c)
+    }
 }

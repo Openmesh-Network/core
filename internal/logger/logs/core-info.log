@@ -1,0 +1,2 @@
+2024-03-15T12:32:39.624+1100	[34mINFO[0m	This is test logger: INFO level
+2024-03-15T12:32:39.625+1100	[31mERROR[0m	This is also test logger: ERROR level

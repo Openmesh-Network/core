@@ -9,6 +9,8 @@ This is the package for logging (based on `zap`).
 logger.InitLogger()
 // Use sugared logger
 logger.Infof("Message: %s", msg)
+// Don't forget to sync your logs when you log to file
+defer logger.SyncAll()
 ```
 
 ## Supported log levels
@@ -64,3 +66,10 @@ Non-sugared logger has a better performance and is more suitable for performance
 zap.L().Info("This is message", zap.String("key", "value"))
 zap.L().Error("Failed to do foo", zap.String("error", err.Error()))
 ```
+
+## Log format
+
+The following two formats are supported:
+
+- `json` (default): Default format that is better for parsing and processing. Example: `{"level":"info","timestamp":"2024-03-15T12:29:34.657+1100","msg":"This is test logger: INFO level"}`
+- `console`: A more human-friendly format. Example: `2024-03-15T12:30:13.390+1100	INFO	This is test logger: INFO level`

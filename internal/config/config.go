@@ -25,7 +25,28 @@ type P2pConfig struct {
 
 // LogConfig is the configuration for zap logger
 type LogConfig struct {
-    Development bool `yaml:"development"` // Development logger has DEBUG level and is more human-friendly
+    Development bool           `yaml:"development"`   // Development logger has DEBUG level and is more human-friendly
+    Encoding    string         `yaml:"encoding"`      // Default: JSON for production
+    InfoConfig  InfoLogConfig  `mapstructure:"info"`  // Sub-config for info-level logs
+    ErrorConfig ErrorLogConfig `mapstructure:"error"` // Sub-config for error-level logs
+}
+
+type InfoLogConfig struct {
+    FileName   string `yaml:"fileName"`   // Name and path to the info log
+    MaxSize    int    `yaml:"maxSize"`    // Megabytes
+    MaxAge     int    `yaml:"maxAge"`     // Days
+    MaxBackups int    `yaml:"maxBackups"` // How much old info log files to retain
+    ToStdout   bool   `yaml:"toStdout"`   // Log to stdout (except file) or not
+    ToFile     bool   `yaml:"toFile"`     // Log to file or not
+}
+
+type ErrorLogConfig struct {
+    FileName   string `yaml:"fileName"`   // Name and path to the error log
+    MaxSize    int    `yaml:"maxSize"`    // Megabytes
+    MaxAge     int    `yaml:"maxAge"`     // Days
+    MaxBackups int    `yaml:"maxBackups"` // How much old error log files to retain
+    ToStderr   bool   `yaml:"toStderr"`   // Log to stderr (except file) or not
+    ToFile     bool   `yaml:"toFile"`     // Log to file or not
 }
 
 // ParseConfig parses the yml configuration file and initialise the Config variable

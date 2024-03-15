@@ -26,7 +26,7 @@ func main() {
 
     // Initialise logger after parsing configuration
     logger.InitLogger()
-    logger.Info("Running logger!!!")
+    defer logger.SyncAll()
 
     // Initialise graceful shutdown.
     cancelCtx, cancel := context.WithCancel(context.Background())
