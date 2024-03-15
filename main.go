@@ -1,15 +1,15 @@
 package main
 
 import (
-	"context"
-	"log"
-	"openmesh.network/openmesh-core/internal/config"
-	"openmesh.network/openmesh-core/internal/core"
-	"openmesh.network/openmesh-core/internal/networking/p2p"
-	"openmesh.network/openmesh-core/internal/updater"
-	"os"
-	"os/signal"
-	"syscall"
+    "context"
+    "openmesh.network/openmesh-core/internal/config"
+    "openmesh.network/openmesh-core/internal/core"
+    "openmesh.network/openmesh-core/internal/logger"
+    "openmesh.network/openmesh-core/internal/networking/p2p"
+    "openmesh.network/openmesh-core/internal/updater"
+    "os"
+    "os/signal"
+    "syscall"
 )
 
 // These are the public keys trusted to sign new updates.
@@ -23,30 +23,36 @@ var TrustedKeys = []updater.PublicKey{
 }
 
 func main() {
-	config.ParseFlags()
-	config.ParseConfig()
+    config.ParseFlags()
+    config.ParseConfig()
 
-	// Initialise graceful shutdown.
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+    // Initialise logger after parsing configuration
+    logger.InitLogger()
+    defer logger.SyncAll()
 
-	// Initialise p2p instance.
-	p2pInstance, err := p2p.NewInstance(cancelCtx).Build()
-	if err != nil {
-		log.Fatalf("Failed to initialise p2p instance: %s", err.Error())
-	}
+    // Initialise graceful shutdown.
+    cancelCtx, cancel := context.WithCancel(context.Background())
+    defer cancel()
 
-	// Run the updater.
-	// TODO: Maybe pass past CID versions to avoid redownloading old updates.
-	updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
+    // Initialise p2p instance.
+    p2pInstance, err := p2p.NewInstance(cancelCtx).Build()
+    if err != nil {
+        logger.Fatalf("Failed to initialise p2p instance: %s", err.Error())
+    }
 
-	// Build and start top-level instance.
-	core.NewInstance().SetP2pInstance(p2pInstance).Start()
+    // Run the updater.
+    // TODO: Maybe pass past CID versions to avoid redownloading old updates.
+    updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+    // Build and start top-level instance.
+    ins := core.NewInstance().SetP2pInstance(p2pInstance)
+    ins.Start()
 
-	// Stop here!
-	sig := <-sigChan
-	log.Printf("Termination signal received: %v", sig)
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+
+    // Stop here!
+    sig := <-sigChan
+    logger.Infof("Termination signal received: %v", sig)
+    ins.Stop()
 }

@@ -2,7 +2,7 @@
 
 These are packages supporting both the inter-node networking and the Xnode overlay network.
 
-## p2p directory
+## Package p2p
 
 This is the library implemented P2P networking based on `libp2p`.
 
@@ -10,7 +10,7 @@ This is the library implemented P2P networking based on `libp2p`.
 
 ```go
 // Construct and start a p2p instance
-ins, err := p2p.NewInstance(cancelContext).Build()
+ins, err := p2p.NewInstance(cancelContext).SetP2PHost(existingHost).Build()
 err = ins.Start()
 ```
 
