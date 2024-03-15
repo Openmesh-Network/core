@@ -13,6 +13,44 @@ logger.Infof("Message: %s", msg)
 defer logger.SyncAll()
 ```
 
+## Configuration
+
+```yaml
+log:
+  # development mode is more human-friendly: console encoding and not log to file
+  development: true
+  # THE FOLLOWING CONFIGS ONLY WORKS IN THE PRODUCTION MODE (development: false)
+  # console or json
+  encoding: console
+  info:
+    # whether log to stdout or not
+    toStdout: true
+    # whether log to file or not
+    toFile: true
+    # path and name of the INFO-level log file
+    fileName: logs/core-info.log
+    # maximum size of a single INFO-level log file (megabytes)
+    maxSize: 10
+    # how many days old INFO-level log files to retain
+    maxAge: 7
+    # how much old INFO-level log files to retain
+    maxBackups: 10
+  error:
+    # whether log to stderr or not
+    toStderr: true
+    # whether log to file or not
+    toFile: true
+    # path and name of the ERROR-level log file
+    fileName: logs/core-error.log
+    # maximum size of a single ERROR-level log file (megabytes)
+    maxSize: 10
+    # how many days old ERROR-level log files to retain
+    maxAge: 7
+    # how much old ERROR-log files to retain
+    maxBackups: 10
+
+```
+
 ## Supported log levels
 
 From [Log levels in Zap](https://betterstack.com/community/guides/logging/go/zap/#log-levels-in-zap):

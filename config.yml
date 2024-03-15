@@ -7,7 +7,7 @@ p2p:
   peerLimit: 50
 log:
   development: true
-  encoding: console
+  encoding: json
   info:
     toStdout: true
     toFile: true

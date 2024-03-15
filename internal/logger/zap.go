@@ -65,30 +65,38 @@ func InitLogger() {
     })
 
     // Initialise log config based on development/production config
-    cfg := zap.NewProductionEncoderConfig()
-    cfg.TimeKey = "timestamp"
-    cfg.EncodeTime = zapcore.ISO8601TimeEncoder
-    if config.Config.Log.Development {
-        cfg = zap.NewDevelopmentEncoderConfig()
+    var encoder zapcore.Encoder
+    cfg := zap.NewDevelopmentEncoderConfig()
+    if !config.Config.Log.Development {
+        cfg = zap.NewProductionEncoderConfig()
+        cfg.TimeKey = "timestamp"
+        cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+        encoder = getEncoder(config.Config.Log.Encoding, cfg)
+    } else {
         cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+        encoder = getEncoder("console", cfg)
     }
-    encoder := getEncoder(config.Config.Log.Encoding, cfg)
 
     // Add log configs to the core based on the configuration provided
     cores := make([]zapcore.Core, 0)
-    if infoConfig.ToFile {
-        cores = append(cores, zapcore.NewCore(encoder, infoFile, infoLevel))
-        syncs = append(syncs, infoFile.Sync)
-    }
-    if infoConfig.ToStdout {
-        cores = append(cores, zapcore.NewCore(encoder, stdout, infoLevel))
-    }
-    if errConfig.ToFile {
-        cores = append(cores, zapcore.NewCore(encoder, errFile, errLevel))
-        syncs = append(syncs, errFile.Sync)
-    }
-    if errConfig.ToStderr {
+    if config.Config.Log.Development {
+        cores = append(cores, zapcore.NewCore(encoder, stdout, zap.NewAtomicLevelAt(zap.DebugLevel)))
         cores = append(cores, zapcore.NewCore(encoder, stderr, errLevel))
+    } else {
+        if infoConfig.ToFile {
+            cores = append(cores, zapcore.NewCore(encoder, infoFile, infoLevel))
+            syncs = append(syncs, infoFile.Sync)
+        }
+        if infoConfig.ToStdout {
+            cores = append(cores, zapcore.NewCore(encoder, stdout, infoLevel))
+        }
+        if errConfig.ToFile {
+            cores = append(cores, zapcore.NewCore(encoder, errFile, errLevel))
+            syncs = append(syncs, errFile.Sync)
+        }
+        if errConfig.ToStderr {
+            cores = append(cores, zapcore.NewCore(encoder, stderr, errLevel))
+        }
     }
 
     // Initialise Zap logger
