@@ -14,7 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multiaddr"
 	"log"
-	"openmesh.network/openmesh-core/internal/config"
+	"github.com/openmesh-network/core/internal/config"
 	"sync"
 	"time"
 )

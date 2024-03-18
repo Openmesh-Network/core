@@ -2,11 +2,11 @@ package main
 
 import (
     "context"
-    "openmesh.network/openmesh-core/internal/config"
-    "openmesh.network/openmesh-core/internal/core"
-    "openmesh.network/openmesh-core/internal/logger"
-    "openmesh.network/openmesh-core/internal/networking/p2p"
-    "openmesh.network/openmesh-core/internal/updater"
+    "github.com/openmesh-network/core/internal/config"
+    "github.com/openmesh-network/core/internal/core"
+    "github.com/openmesh-network/core/internal/logger"
+    "github.com/openmesh-network/core/internal/networking/p2p"
+    "github.com/openmesh-network/core/internal/updater"
     "os"
     "os/signal"
     "syscall"

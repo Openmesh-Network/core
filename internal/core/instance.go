@@ -2,7 +2,7 @@ package core
 
 import (
 	"log"
-	"openmesh.network/openmesh-core/internal/networking/p2p"
+	"github.com/openmesh-network/core/internal/networking/p2p"
 )
 
 // Instance is the top-level instance
