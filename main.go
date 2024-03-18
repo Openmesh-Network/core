@@ -15,7 +15,7 @@ import (
 // These are the public keys trusted to sign new updates.
 var TrustedKeys = []updater.PublicKey{
 	// XXX: THESE ARE NOT THE FINAL KEYS, CHANGE BEFORE DEPLOYING TO PRODUCTION!!!
-	updater.PublicKeyFromBase64("em9//dXGUM4iQR348WqHmNtvin0HYkLQQCOqbufssbA"),
+	updater.PublicKeyFromBase64("HJOvRAmk3tYFvs2uFm+06T6kU9MC2oT+8s1Scwqf224"),
 	// updater.PublicKeyFromBase64("jt1/Mb2xWnd7z6pn21iTb9EU4wycdZhT6Zgb3xf+h6k"),
 	// updater.PublicKeyFromBase64("+8rZEcO928jPGlkn0CZKbXxi11twmZbj9KxxBvTa15Q"),
 	// Fake key
