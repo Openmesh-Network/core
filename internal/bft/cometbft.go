@@ -1,7 +1,7 @@
 package bft
 
 import (
-    "database/sql"
+   
     "fmt"
     cfg "github.com/cometbft/cometbft/config"
     cmtflags "github.com/cometbft/cometbft/libs/cli/flags"
@@ -15,6 +15,7 @@ import (
     "openmesh.network/openmesh-core/internal/config"
     "openmesh.network/openmesh-core/internal/logger"
     "os"
+    "github.com/dgraph-io/badger/v3"
 )
 
 // Instance is the CometBFT instance
@@ -24,7 +25,7 @@ type Instance struct {
 }
 
 // NewInstance initialise a CometBFT instance use the config specified
-func NewInstance(db *sql.DB) (*Instance, error) {
+func NewInstance(db *badger.DB) (*Instance, error) {
     conf := cfg.DefaultConfig()
     homeDir := config.Config.BFT.HomeDir
     conf.SetRoot(homeDir)

@@ -41,10 +41,7 @@ func (i *Instance) Start() {
         logger.Fatalf("Failed to start p2p instance: %s", err.Error())
     }
 
-    if err = i.DB.Start(); err != nil {
-        defer i.DB.Stop()
-        logger.Fatalf("Failed to start database instance: %s", err.Error())
-    }
+    
 
     i.BFT.Start()
 }
@@ -55,9 +52,7 @@ func (i *Instance) Stop() {
         logger.Errorf("Failed to stop p2p instance: %s", err.Error())
     }
 
-    if err := i.DB.Stop(); err != nil {
-        logger.Errorf("Failed to stop PostgreSQL connection: %s", err.Error())
-    }
+   
 
     if err := i.BFT.Stop(); err != nil {
         logger.Errorf("Failed to stop CometBFT instance: %s", err.Error())
