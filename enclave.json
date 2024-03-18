@@ -1,0 +1,23 @@
+{
+    "exe": "main",
+    "key": "private.pem",
+    "debug": true,
+    "heapSize": 512,
+    "executableHeap": false,
+    "productID": 1,
+    "securityVersion": 1,
+    "env": null,
+    "mounts": [
+        {
+            "source": "/tmp",
+            "target": "/tmp",
+            "type": "hostfs"
+        }
+    ],
+    "files": [
+        {
+            "source": "./config.yml",
+            "target": "./config.yml"
+        }
+    ]
+}
