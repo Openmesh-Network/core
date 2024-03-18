@@ -31,7 +31,7 @@ var Sources = [...]Source{
 	// Exchanges:
 	// Note that the symbols are incomplete as they are undecided.
 	{"binance", defaultJoinCEX, "wss://stream.binance.com:9443/ws", []string{"usdt.usdc", "btc.eth", "eth.usdt"}, "{\"method\": \"SUBSCRIBE\", \"params\": [ \"{{symbol}}@aggTrade\" ], \"id\": 1}"},
-	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{symbol}}\" ], \"channels\": [ \"ticker\" ]}"},
+	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BT-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{symbol}}\" ], \"channels\": [ \"ticker\" ]}"},
 	{"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{symbol}}\", \"channel\": \"v3_trades\"}"},
 
 	// Blockchain RPCs:
@@ -121,39 +121,52 @@ func ankrJoinRPC(ctx context.Context, source Source, symbol string) (chan []byte
 	go func() {
 		buffer := bytes.NewBuffer(make([]byte, 1024000))
 		headerPrevious := common.Hash{}
+		defer ethereum_client.Close()
+
+		// 1 block per second + request delay is roughly alright since new blocks take ~11 seconds.
+		// Ankr gives us 20 requests per second with their RPC, so we're also not exhausting that.
+		timeTicker := time.Tick(time.Second)
 
 		for {
-			fmt.Println("Waiting for block...")
-			block, err := ethereum_client.BlockByNumber(ctx, nil)
-			fmt.Println("Got block!")
+			select {
+			case <-ctx.Done():
+				// Quit gracefully, out context was handled above.
+			case <-timeTicker:
+				// XXX: This might add 2 seconds to shutdown. It's unfortunate, but it guarantees error checks below
+				// actually error on the state of the request, not the parent's context.
+				ctxToPreventHanging, cancel := context.WithTimeout(context.Background(), time.Second*2)
+				defer cancel()
+				fmt.Println("Waiting for block...")
+				block, err := ethereum_client.BlockByNumber(ctxToPreventHanging, nil)
+				fmt.Println("Got block!")
 
-			if err != nil {
-				// HACK: Lazy error handling, actually fix this.
-				panic(err)
-			} else {
-				headerProspective := block.Header().Hash()
-				if headerPrevious == headerProspective {
-					// Same block as last time we checked, ignore.
+				if err != nil {
+					// HACK: Lazy error handling, find better strategy later.
+					panic(err)
 				} else {
-					// Serialize the block in RLP format.
-					fmt.Println("Serializing block...")
-					buffer.Reset()
-					headerPrevious = block.Header().Hash()
-					err := block.EncodeRLP(buffer)
-					fmt.Println("Block serialized!")
-
-					if err != nil {
-						// HACK: Lazy error handling, actually fix this.
-						panic(err)
+					headerProspective := block.Header().Hash()
+					if headerPrevious == headerProspective {
+						// Same block as last time we checked, ignore.
 					} else {
-						fmt.Println("Sending over channel,", buffer.Len())
+						// Serialize the block in RLP format.
+						fmt.Println("Serializing block...")
+						buffer.Reset()
+						headerPrevious = block.Header().Hash()
+						err := block.EncodeRLP(buffer)
+						fmt.Println("Block serialized!")
 
-						msgChannel <- buffer.Bytes()
+						if err != nil {
+							// HACK:: Lazy error handling, find better strategy later.
+							panic(err)
+						} else {
+							fmt.Println("Sending over channel,", buffer.Len())
 
-						fmt.Println("Sent.")
+							msgChannel <- buffer.Bytes()
+
+							fmt.Println("Sent.")
+						}
 					}
 				}
-				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
