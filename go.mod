@@ -20,6 +20,7 @@ require (
 	golang.org/x/net v0.22.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	nhooyr.io/websocket v1.8.10
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
