@@ -2,9 +2,13 @@ package validator
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func TestSourcesTableSanity(t *testing.T) {
@@ -63,8 +67,8 @@ func TestAnkrJoin(t *testing.T) {
 	defer cancel()
 
 	t.Log("Got here no issue")
-	t.Log(Sources[3].Symbols[0])
-	c, err := ankrJoinRPC(ctx, Sources[3], Sources[3].Symbols[0])
+	t.Log(Sources[4].Symbols[0])
+	c, err := ankrJoinRPC(ctx, Sources[4], Sources[4].Symbols[0])
 
 	if err != nil {
 		t.Error(err)
@@ -79,5 +83,36 @@ func TestAnkrJoin(t *testing.T) {
 	}
 }
 
-func TestBinanceFull(t *testing.T) {
+// func TestBinanceFull(t *testing.T) {
+// }
+
+func TestOpenSea(t *testing.T) {
+	// MOVE THIS LATER!
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("No .env file found")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	key, exist := os.LookupEnv("OPENSEA_API_KEY")
+	if exist {
+		fmt.Printf("THE KEY: %s\n", key)
+	} else {
+		fmt.Println("NO KEY FOUND IN ENVIRONMENT")
+	}
+
+	t.Log(Sources[3].Symbols[0])
+	c, err := defaultJoinNFTCEX(ctx, Sources[3], Sources[3].Symbols[0])
+
+	if err != nil {
+		t.Error(err)
+	} else {
+		for i := 0; i < 100; i++ {
+			// fmt.Println(string(<-c))
+			<-c
+		}
+		cancel()
+		t.Log("Stopping...")
+		t.Log("This ran")
+	}
 }
