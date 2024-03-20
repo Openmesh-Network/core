@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/openmesh-network/core/internal/config"
 	"github.com/openmesh-network/core/internal/core"
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/internal/networking/p2p"
 	"github.com/openmesh-network/core/updater"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 // These are the public keys trusted to sign new updates.
@@ -25,6 +26,7 @@ var TrustedKeys = []updater.PublicKey{
 func main() {
 	config.ParseFlags()
 	config.ParseConfig()
+	// Add some decision-making about which source to listen to, based on available sources (based on which api keys are provided).
 
 	// Initialise logger after parsing configuration
 	logger.InitLogger()

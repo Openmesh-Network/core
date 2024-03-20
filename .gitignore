@@ -31,3 +31,6 @@ go.work
 
 core
 executable-file
+
+/ignore
+/internal/validator/.env
