@@ -2,65 +2,82 @@ package validator
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
-	"golang.org/x/net/websocket"
-
+	openseaSdk "github.com/721tools/stream-api-go/sdk"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/joho/godotenv"
+	"golang.org/x/net/context"
+	"nhooyr.io/websocket" // Docs are hard to find: https://pkg.go.dev/nhooyr.io/websocket; Or, use gorilla websockets?
+	// Rate limited, but events don't count after you're subscribed.
 )
 
-// TODO: Check which exchanges are wanted / desireable. Also, find which symbols we should care about.
+// TODO: Check which exchanges are wanted / desireable. Also, find which topics we should care about.
 
 // Defines a "source" of data, all supported sources are laid out in the Sources array.
 // We opt for this approach over oop for clarity and extensibility.
 type Source struct {
 	Name     string
-	JoinFunc func(ctx context.Context, source Source, symbol string) (chan []byte, error)
-	ApiURL   string
-	Symbols  []string
-	// Request field will have {{symbol}} replaced with the actual symbol in the call to wsCEXJoin.
-	Request string
+	JoinFunc func(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error)
+	ApiURL   string // To-do: Add support for multiple endpoints.
+	Topics   []string
+	Request  string
 }
 
 // The master table with all our sources.
 var Sources = [...]Source{
 	// Exchanges:
-	// Note that the symbols are incomplete as they are undecided.
-	{"binance", defaultJoinCEX, "wss://stream.binance.com:9443/ws", []string{"usdt.usdc", "btc.eth", "eth.usdt"}, "{\"method\": \"SUBSCRIBE\", \"params\": [ \"{{symbol}}@aggTrade\" ], \"id\": 1}"},
-	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{symbol}}\" ], \"channels\": [ \"ticker\" ]}"},
-	{"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{symbol}}\", \"channel\": \"v3_trades\"}"},
+	// Note that the topics are incomplete as they are undecided.
+	{"binance", defaultJoinCEX, "wss://stream.binance.com:9443/ws", []string{"usdt.usdc", "btc.eth", "eth.usdt"}, "{\"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1}"},
+	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"},
+	{"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{topic}}\", \"channel\": \"v3_trades\"}"},
+	// CEX NFT marketplace:
+	// Opensea Request structure: {topic: \ event: \ payload:{} \ ref: }
+	{"opensea", defaultJoinNFTCEX, "wss://stream.openseabeta.com/socket", []string{"item_listed", "item_cancelled", "item_sold", "item_transferred", "item_received_offer", "item_received_bid"}, "collections:*"},
 
 	// Blockchain RPCs:
 	{"ethereum-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/eth", []string{""}, ""},
 }
 
 // Subscribe will connect to the chosen source and create a channel to get data out of it.
-func Subscribe(ctx context.Context, source Source, symbol string, bufferSizeMax int) (chan []byte, error) {
+func Subscribe(ctx context.Context, source Source, topic string, bufferSizeMax int) (chan []byte, error) {
 	// TODO: Not sure if it's better to use a shared buffer here instead of a channel.
 	// That would let us do custom compression behaviour at the exchange level.
 	// If we move to a buffer, using a ring/circular buffer sounds like a good idea.
 
-	msgChannel, err := source.JoinFunc(ctx, source, symbol)
+	msgChannel, errChannel, err := source.JoinFunc(ctx, source, topic)
 	if err != nil {
 		return nil, err
 	}
 
-	// We do this instead of just returning the msgChannel because we want control over the compresion in the future.
 	outChannel := make(chan []byte)
+	outErrChannel := make(chan error, 1)
+
 	go func() {
+		defer close(outChannel)
+		defer close(outErrChannel)
 		for {
 			select {
 			case msg := <-msgChannel:
-				// TODO: Add optional callback to re-encode the data for better size efficiency here.
-
-				outChannel <- msg
-				break
+				select {
+				case outChannel <- msg:
+				case <-ctx.Done():
+					return
+				}
+			case err := <-errChannel:
+				select {
+				case outErrChannel <- err:
+					return
+				case <-ctx.Done():
+					return
+				}
 			case <-ctx.Done():
-				break
+				return
 			}
 		}
 	}()
@@ -68,96 +85,153 @@ func Subscribe(ctx context.Context, source Source, symbol string, bufferSizeMax 
 	return outChannel, nil
 }
 
-// Default function for CEXs since the majority of them use this functionality.
-// Note that we assume that the symbol is in the source's format.
-func defaultJoinCEX(ctx context.Context, source Source, symbol string) (chan []byte, error) {
-	ws, err := websocket.Dial(source.ApiURL, "", source.ApiURL)
+func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
+	ws, resp, err := websocket.Dial(ctx, source.ApiURL, &websocket.DialOptions{
+		Subprotocols: []string{"phoenix"},
+	})
 	if err != nil {
+		fmt.Println(resp)
 		panic(err)
 	}
 
-	// HACK: This is the simplest tool for the job right now. Importing a whole templating library is 100% overkill.
-	request := strings.Replace(source.Request, "{{symbol}}", symbol, 1)
-
-	ws.Write([]byte(request))
+	request := strings.Replace(source.Request, "{{topic}}", topic, 1)
+	ws.Write(ctx, websocket.MessageBinary, []byte(request))
 
 	msgChannel := make(chan []byte)
+	errChannel := make(chan error, 1)
+
 	go func() {
-		// XXX: Move this goshforsaken allocation at some point (Maybe move to global collector struct?).
-		// Also note that this means messages higher than 2048 bytes in length will be sent in 2 chunks over the channel.
-		buf := make([]byte, 2048)
+		defer close(msgChannel)
+		defer close(errChannel)
 		for {
-			n, err := ws.Read(buf)
+			ntype, n, err := ws.Read(ctx)
+			fmt.Printf("Recieved message of type: %s", ntype)
 			if err != nil {
-				// Connection was severed, so quit.
+				errChannel <- err
 				return
 			} else {
-				// Append message to message channel.
-				msgChannel <- buf[:n]
+				msgChannel <- n
 			}
 		}
 	}()
 
 	go func() {
 		<-ctx.Done()
-		// Closing the websocket here should end the other goroutine.
-		ws.Close()
+		ws.CloseNow()
 	}()
-
-	return msgChannel, nil
+	return msgChannel, errChannel, nil
 }
 
-func ankrJoinRPC(ctx context.Context, source Source, symbol string) (chan []byte, error) {
-	// Note that ankr has a 30requests / second guarantee. We can't spam their endpoint more than that.
-	// Plus they have a hard limit on the request body size.
-
-	fmt.Println("Dialing...")
+func ankrJoinRPC(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
 	ethereum_client, err := ethclient.Dial(source.ApiURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	fmt.Println("Dialed!")
 
 	msgChannel := make(chan []byte)
+	errChannel := make(chan error, 1)
+
 	go func() {
 		buffer := bytes.NewBuffer(make([]byte, 1024000))
 		headerPrevious := common.Hash{}
+		defer ethereum_client.Close()
+
+		// 1 block per second + request delay is roughly alright since new blocks take ~11 seconds.
+		// Ankr gives us 20 requests per second with their RPC, so we're also not exhausting that.
+		timeTicker := time.Tick(time.Second)
 
 		for {
-			fmt.Println("Waiting for block...")
-			block, err := ethereum_client.BlockByNumber(ctx, nil)
-			fmt.Println("Got block!")
+			select {
+			case <-ctx.Done():
+				// Quit gracefully, out context was handled above.
+			case <-timeTicker:
+				// XXX: This might add 2 seconds to shutdown. It's unfortunate, but it guarantees error checks below
+				// actually error on the state of the request, not the parent's context.
+				ctxToPreventHanging, cancel := context.WithTimeout(context.Background(), time.Second*2)
+				defer cancel()
+				fmt.Println("Waiting for block...")
+				block, err := ethereum_client.BlockByNumber(ctxToPreventHanging, nil)
+				fmt.Println("Got block!")
 
-			if err != nil {
-				// HACK: Lazy error handling, actually fix this.
-				panic(err)
-			} else {
+				if err != nil {
+					errChannel <- err
+					return
+				}
+
 				headerProspective := block.Header().Hash()
-				if headerPrevious == headerProspective {
-					// Same block as last time we checked, ignore.
-				} else {
-					// Serialize the block in RLP format.
-					fmt.Println("Serializing block...")
+				if headerPrevious != headerProspective {
 					buffer.Reset()
 					headerPrevious = block.Header().Hash()
 					err := block.EncodeRLP(buffer)
-					fmt.Println("Block serialized!")
-
 					if err != nil {
-						// HACK: Lazy error handling, actually fix this.
-						panic(err)
-					} else {
-						fmt.Println("Sending over channel,", buffer.Len())
-
-						msgChannel <- buffer.Bytes()
-
-						fmt.Println("Sent.")
+						errChannel <- err
+						return
 					}
+					msgChannel <- buffer.Bytes()
 				}
-				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
 
-	return msgChannel, nil
+	return msgChannel, errChannel, nil
+}
+
+func defaultJoinNFTCEX(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
+	// Get users api key.
+	apiKey := getVarFromEnv("OPENSEA_API_KEY") // Refactor for any NFT CEX later.
+
+	fmt.Println("Found OpenSea API Key in environment")
+
+	ns := openseaSdk.NewNotifyService(openseaSdk.MAIN_NET, apiKey)
+	msgChannel := make(chan []byte, 1000)
+	errChannel := make(chan error, 1)
+
+	var subscribeErr error
+
+	unsubscribe, subscribeErr := ns.Subscribe("*", topic, func(msg *openseaSdk.Message) error {
+		bmsg, err := json.Marshal(msg)
+		if err != nil {
+			return err
+		}
+		select {
+		case msgChannel <- bmsg:
+		case <-ctx.Done():
+			fmt.Println("Context is done, exiting goroutine")
+			return ctx.Err()
+		}
+		return nil
+	})
+
+	if subscribeErr != nil {
+		fmt.Println("Error subscribing:", subscribeErr)
+		return nil, nil, subscribeErr
+	}
+
+	go func() {
+		defer close(msgChannel)
+		defer close(errChannel)
+		defer unsubscribe() // Unsubscribe when the goroutine exits
+
+		ns.Start()
+
+		<-ctx.Done()
+		fmt.Println("Context is done, exiting Go routine")
+	}()
+
+	return msgChannel, errChannel, nil
+}
+
+func getVarFromEnv(envKey string) string {
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("No .env file found")
+	}
+
+	envVar := os.Getenv(envKey)
+	if envVar == "" {
+		err := "Unable to find " + envKey
+		fmt.Println("ERROR:", err)
+		panic(err)
+	}
+	fmt.Println("Found OpenSea API Key in environment")
+	return envVar
 }

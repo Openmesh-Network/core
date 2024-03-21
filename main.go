@@ -3,17 +3,14 @@ package main
 import (
 	"context"
 	_ "embed"
+	"github.com/openmesh-network/core/internal/config"
+	"github.com/openmesh-network/core/internal/core"
+	"github.com/openmesh-network/core/internal/logger"
+	"github.com/openmesh-network/core/internal/networking/p2p"
+	"github.com/openmesh-network/core/updater"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"openmesh.network/openmesh-core/internal/bft"
-	"openmesh.network/openmesh-core/internal/config"
-	"openmesh.network/openmesh-core/internal/core"
-	"openmesh.network/openmesh-core/internal/database"
-	"openmesh.network/openmesh-core/internal/logger"
-	"openmesh.network/openmesh-core/internal/networking/p2p"
-	"openmesh.network/openmesh-core/internal/updater"
 )
 
 const (
@@ -24,8 +21,11 @@ var (
 	// These are the public keys trusted to sign new updates.
 	TrustedKeys = []updater.PublicKey{
 		// XXX: THESE ARE NOT THE FINAL KEYS, CHANGE BEFORE DEPLOYING TO PRODUCTION!!!
-		updater.PublicKeyFromBase64("JZlpAGC7aYXIupMUQN48daT/tYRulWiOC0sXFNEXFNE"),
+		updater.PublicKeyFromBase64("HJOvRAmk3tYFvs2uFm+06T6kU9MC2oT+8s1Scwqf224"),
+		// updater.PublicKeyFromBase64("jt1/Mb2xWnd7z6pn21iTb9EU4wycdZhT6Zgb3xf+h6k"),
 		// updater.PublicKeyFromBase64("+8rZEcO928jPGlkn0CZKbXxi11twmZbj9KxxBvTa15Q"),
+		// Fake key
+		// updater.PublicKeyFromBase64("JZlpAGC7aYXIupMUQN48daT/tYRulWiOC0sXFNEXFNE"),
 	}
 	//go:embed config.yml
 	configCompileValue string
@@ -51,7 +51,7 @@ func main() {
 		logger.Fatalf("Failed to initialise p2p instance: %s", err.Error())
 	}
 
-	// Initialise PostgreSQL connection
+	// Initialise BadgerDB connection
 	dbInstance, err := database.NewInstance()
 	if err != nil {
 		logger.Fatalf("Failed to establish PostgreSQL connection: %s", err.Error())
@@ -79,6 +79,14 @@ func main() {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+
+	// Run the updater.
+	// TODO: Maybe pass past CID versions to avoid redownloading old updates.
+	updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
+
+	// Build and start top-level instance.
+	ins := core.NewInstance().SetP2pInstance(p2pInstance)
+	ins.Start()
 
 	// Stop here!
 	sig := <-sigChan

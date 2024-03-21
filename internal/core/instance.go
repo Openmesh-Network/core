@@ -1,10 +1,15 @@
 package core
 
 import (
+<<<<<<< HEAD
     "openmesh.network/openmesh-core/internal/bft"
     "openmesh.network/openmesh-core/internal/database"
     "openmesh.network/openmesh-core/internal/logger"
     "openmesh.network/openmesh-core/internal/networking/p2p"
+=======
+	"log"
+	"github.com/openmesh-network/core/internal/networking/p2p"
+>>>>>>> b7b582500811f72e2c00742617774054938e20bf
 )
 
 // Instance is the top-level instance

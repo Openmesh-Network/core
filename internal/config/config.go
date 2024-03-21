@@ -2,7 +2,10 @@ package config
 
 import (
 	"log"
+<<<<<<< HEAD
 	"strings"
+=======
+>>>>>>> b7b582500811f72e2c00742617774054938e20bf
 
 	"github.com/spf13/viper"
 )
@@ -14,9 +17,13 @@ var Config config
 // config is the configuration structure for the whole Openmesh Core project
 type config struct {
 	P2P P2pConfig `yaml:"p2p"`
+<<<<<<< HEAD
 	BFT BFTConfig `yaml:"bft"`
 	Log LogConfig `yaml:"log"`
 	DB  DBConfig  `yaml:"db"`
+=======
+	Log LogConfig `yaml:"log"`
+>>>>>>> b7b582500811f72e2c00742617774054938e20bf
 }
 
 // P2pConfig is the configuration for libp2p-related instances
@@ -25,6 +32,7 @@ type P2pConfig struct {
 	Port      int    `yaml:"port"`      // libp2p listening port
 	GroupName string `yaml:"groupName"` // Name used for discovering nodes via mDNS
 	PeerLimit int    `yaml:"peerLimit"` // Max number of peers this node can establish connection to
+<<<<<<< HEAD
 }
 
 // DBConfig is the configuration for database connection and operation
@@ -39,6 +47,8 @@ type DBConfig struct {
 // BFTConfig is the configuration for using CometBFT
 type BFTConfig struct {
 	HomeDir string `yaml:"homeDir"` // Path to CometBFT config
+=======
+>>>>>>> b7b582500811f72e2c00742617774054938e20bf
 }
 
 // LogConfig is the configuration for zap logger
@@ -65,6 +75,7 @@ type ErrorLogConfig struct {
 	MaxBackups int    `yaml:"maxBackups"` // How much old error log files to retain
 	ToStderr   bool   `yaml:"toStderr"`   // Log to stderr (except file) or not
 	ToFile     bool   `yaml:"toFile"`     // Log to file or not
+<<<<<<< HEAD
 }
 
 // ParseConfig parses the yml configuration file and initialise the Config variable
@@ -87,6 +98,24 @@ func ParseConfig(configAtCompileTime string, allowRuntimeConfigFile bool) {
 	}
 
 	if err := coreConf.Unmarshal(&Config); err != nil {
+=======
+}
+
+type CollectorConfig struct {
+	ApiKeys map[string]string `yaml:"apiKeys"` // API keys for each authenticated source
+}
+
+// ParseConfig parses the yml configuration file and initialise the Config variable
+func ParseConfig() {
+	viper.AddConfigPath(Path)
+	viper.SetConfigName(Name)
+	viper.SetConfigType("yaml")
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Failed to read the configuration: %s", err.Error())
+	}
+	if err := viper.Unmarshal(&Config); err != nil {
+>>>>>>> b7b582500811f72e2c00742617774054938e20bf
 		log.Fatalf("Failed to parse the configuration: %s", err.Error())
 	}
 }

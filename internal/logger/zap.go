@@ -4,7 +4,7 @@ import (
     "go.uber.org/zap"
     "go.uber.org/zap/zapcore"
     "gopkg.in/natefinch/lumberjack.v2"
-    "openmesh.network/openmesh-core/internal/config"
+    "github.com/openmesh-network/core/internal/config"
     "os"
 )
 

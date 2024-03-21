@@ -10,8 +10,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"io"
@@ -19,14 +17,13 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/multiformats/go-multiaddr"
-	"openmesh.network/openmesh-core/internal/networking/p2p"
+    "github.com/openmesh-network/core/internal/networking/p2p"
 
 	"github.com/ipfs/boxo/blockservice"
 	blockstore "github.com/ipfs/boxo/blockstore"
@@ -76,6 +73,10 @@ var numbers = []int{
 
 func plusTwo(a int) int {
 	return 2 + a
+}
+
+func (u *UpdaterInstance) testFunc() {
+	fmt.Println("I love this!")
 }
 
 func PublicKeyFromBase64(base64KeyString string) PublicKey {
@@ -230,10 +231,10 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 			}
 
 			// XXX: Make 100% sure this logic makes sense:
-			// Want #ValidSignatures >= #Keys * 2/3 to be true for 66% concensus.
-			// So it simplifies to 3 * #ValidSignatures >= 2 * #Keys.
-			over51PercentThreshold := len(u.TrustedKeys)*2 <= highestTally*3
-			if over51PercentThreshold {
+			// Want #ValidSignatures >= #TotalKeys * 2/3 to be true for 66% concensus.
+			// So it simplifies to 3 * #ValidSignatures >= 2 * #TotalKeys.
+			over66PercentThreshold := len(u.TrustedKeys)*2 <= highestTally*3
+			if over66PercentThreshold {
 				var err error
 				c, err = cid.Cast(u.LatestVerifiedRequests[mostPopularCidIndex].Content.BinaryCid)
 
@@ -278,20 +279,25 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 			// and reconnect to our peers if we want them to be actually "registered" by bsnet.
 			for _, peerId := range h.Network().Peers() {
 				// XXX: Find a good timeout for reconnecting to old peers. Also find if there's a better way to handle this bitswap issue.
-				ctx, cancel := context.WithTimeout(ctx, time.Second*1)
+				ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 				defer cancel()
 
 				fmt.Println("Connecting to:", peerId)
 				err := n.DisconnectFrom(ctx, peerId)
+				fmt.Println("Success:", peerId)
 				if err != nil {
-					panic(err)
-				}
-
-				err = n.ConnectTo(ctx, peerId)
-				if err != nil {
-					panic(err)
+					fmt.Println("Failed to disconnect from:", peerId)
+					// panic(err)
+				} else {
+					err = n.ConnectTo(ctx, peerId)
+					fmt.Println("Success:", peerId)
+					if err != nil {
+						fmt.Println("Failed to connect to:", peerId)
+						//panic(err)
+					}
 				}
 			}
+			time.Sleep(time.Second * 10)
 
 			dserv := merkledag.NewReadOnlyDagService(merkledag.NewSession(ctx, merkledag.NewDAGService(blockservice.New(blockstore.NewBlockstore(datastore.NewNullDatastore()), bswap))))
 			nd, err := dserv.Get(ctx, c)
@@ -313,6 +319,7 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 			return buf.Bytes(), nil
 		}
 
+		// ConnectToMultiaddr(ctx, h, "/ip4/10.0.17.23/tcp/4001/p2p/12D3KooWPawRnPFja1wdPs579nQyimdTtpednBR7bG6aS5kbh7xB")
 		buf, err := getFile(h, c)
 
 		if err != nil {
@@ -337,6 +344,7 @@ func (u *UpdaterInstance) UpdateIfAppropriate(h host.Host) bool {
 	}
 }
 
+// Used for debugging, will panic on err.
 func NewHost() host.Host {
 	var h host.Host
 	{
@@ -351,6 +359,9 @@ func NewHost() host.Host {
 		}
 
 		h, err = libp2p.New(opts...)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return h
@@ -363,122 +374,19 @@ func HostToString(h host.Host) string {
 	return addr.Encapsulate(hostAddr).String()
 }
 
-func referenceUsageDeleteLater() {
-	sigs := make(chan os.Signal, 1)
-
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		<-sigs
-		cancel()
-	}()
-
-	h := NewHost()
-	fmt.Println("Listening on address: ", HostToString(h))
-
-	defer cancel()
-
-	// TODO: This needs to get the file from an actual IPFS network
-	pubsub, err := pubsub.NewGossipSub(ctx, h)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Joined topic!")
-	topic, err := pubsub.Join("openmesh-core-update")
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Subscribed to topic")
-	subscription, err := topic.Subscribe()
-	if err != nil {
-		panic(err)
-	}
-
-	var updater UpdaterInstance
-	trusted_keys_base64 := []string{"JZlpAGC7aYXIupMUQN48daT/tYRulWiOC0sXFNEXFNE", "+8rZEcO928jPGlkn0CZKbXxi11twmZbj9KxxBvTa15Q"}
-	updater.TrustedKeys = make([]PublicKey, len(trusted_keys_base64))
-	updater.LatestVerifiedRequests = make([]UpdateRequest, len(trusted_keys_base64))
-
-	for key_index := range trusted_keys_base64 {
-		key_bytes, err := base64.RawStdEncoding.DecodeString(trusted_keys_base64[key_index])
-		fmt.Println(key_bytes)
-
-		if err != nil {
-			panic(err)
-		}
-
-		for i := range key_bytes {
-			updater.TrustedKeys[key_index][i] = key_bytes[i]
-		}
-	}
-
-	// Check peers and log.
-	// go func() {
-	// 	ticker := time.NewTicker(time.Millisecond * 100)
-	// 	peer_count_last := h.Peerstore().Peers().Len()
-	// 	for {
-	// 		select {
-	// 		case <-ctx.Done():
-	// 			break
-	// 		case <-ticker.C:
-	// 			peer_count := h.Peerstore().Peers().Len()
-	// 			if peer_count_last < peer_count {
-	// 				fmt.Println("Changed peers had:", peer_count_last, "now:", peer_count)
-	// 				peer_count_last = peer_count
-	// 			}
-	// 		}
-	// 	}
-	// }()
-
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		default:
-			fmt.Println("Waiting for message.")
-			message, err := subscription.Next(ctx)
-			fmt.Println("Got message.")
-			if err != nil {
-				fmt.Println(err)
-			}
-			fmt.Println(message)
-
-			var request_buffer bytes.Buffer
-			request_buffer.Write(message.Data)
-			decoder := gob.NewDecoder(&request_buffer)
-
-			var request UpdateRequest
-			decoder.Decode(&request)
-
-			fmt.Println(message.Data)
-			fmt.Println(request)
-
-			updater.VerifyRequest(request)
-			if updater.UpdateIfAppropriate(h) {
-				fmt.Println("Success, spawned child process! Updater is finished.")
-				cancel()
-				os.Exit(0)
-			}
-		}
-	}
-}
-
 func (updater *UpdaterInstance) Start(ctx context.Context) {
 	fmt.Println("Updater listening on address: ", HostToString(*updater.P2pInstance.Host))
 
 	// TODO: This needs to get the file from an actual IPFS network
 	err := updater.P2pInstance.JoinTopic("openmesh-core-update")
 	if err != nil {
-		// HACK: Handle this sensibly.
+		// HACK: Should handle this sensibly.
 		panic(err)
 	}
 
 	subscription, err := updater.P2pInstance.Subscribe("openmesh-core-update")
 	if err != nil {
-		// HACK: Handle this sensibly.
+		// HACK: Should handle this sensibly.
 		panic(err)
 	}
 
@@ -487,11 +395,9 @@ func (updater *UpdaterInstance) Start(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				break
-			default:
-				fmt.Println("Waiting for message.")
-
-				message := <-subscription
+			case message := <-subscription:
 				fmt.Println("Got message.")
+
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -507,7 +413,10 @@ func (updater *UpdaterInstance) Start(ctx context.Context) {
 				fmt.Println(message.Data)
 				fmt.Println(request)
 
-				updater.VerifyRequest(request)
+				// TODO: Handle misbehaving nodes here.
+				if !updater.VerifyRequest(request) {
+					// TODO: I think I can disconnect from this peer here. Maybe assign social credit score or something?
+				}
 				if updater.UpdateIfAppropriate(*updater.P2pInstance.Host) {
 					fmt.Println("Success, spawned child process! Updater is finished.")
 					os.Exit(0)

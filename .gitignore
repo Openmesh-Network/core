@@ -30,3 +30,9 @@ go.work
 
 # Arbitrary trashes
 .DS_Store
+
+core
+executable-file
+
+/ignore
+/internal/validator/.env

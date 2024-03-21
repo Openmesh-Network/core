@@ -3,7 +3,7 @@ package p2p
 import (
     "context"
     "github.com/stretchr/testify/assert"
-    "openmesh.network/openmesh-core/internal/config"
+    "github.com/openmesh-network/core/internal/config"
     "testing"
     "time"
 )

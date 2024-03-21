@@ -1,6 +1,7 @@
 package p2p
 
 import (
+<<<<<<< HEAD
     "context"
     "crypto/rand"
     "fmt"
@@ -17,6 +18,24 @@ import (
     "openmesh.network/openmesh-core/internal/config"
     "sync"
     "time"
+=======
+	"context"
+	"crypto/rand"
+	"fmt"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
+	"github.com/multiformats/go-multiaddr"
+	"log"
+	"github.com/openmesh-network/core/internal/config"
+	"sync"
+	"time"
+>>>>>>> b7b582500811f72e2c00742617774054938e20bf
 )
 
 // Instance is the libp2p instance for networking usage.
