@@ -1,8 +1,8 @@
 {
-    "exe": "main",
+    "exe": "openmesh-core",
     "key": "private.pem",
     "debug": true,
-    "heapSize": 512,
+    "heapSize": 513,
     "executableHeap": false,
     "productID": 1,
     "securityVersion": 1,

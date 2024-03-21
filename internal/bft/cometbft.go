@@ -43,7 +43,7 @@ func NewInstance(db *badger.DB) (*Instance, error) {
 		return nil, err
 	}
 
-	app := abci.NewKVStoreApplication(db)
+	app := abci.NewVerificationApp(db)
 	pv := privval.LoadFilePV(
 		conf.PrivValidatorKeyFile(),
 		conf.PrivValidatorStateFile(),
