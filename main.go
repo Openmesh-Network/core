@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	_ "embed"
+	"github.com/openmesh-network/core/internal/bft"
 	"github.com/openmesh-network/core/internal/config"
 	"github.com/openmesh-network/core/internal/core"
+	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/internal/networking/p2p"
 	"github.com/openmesh-network/core/updater"
@@ -79,14 +81,6 @@ func main() {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-
-	// Run the updater.
-	// TODO: Maybe pass past CID versions to avoid redownloading old updates.
-	updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
-
-	// Build and start top-level instance.
-	ins := core.NewInstance().SetP2pInstance(p2pInstance)
-	ins.Start()
 
 	// Stop here!
 	sig := <-sigChan

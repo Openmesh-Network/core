@@ -1,5 +1,5 @@
 syntax = "proto3";
-option go_package = "openmesh.network/openmesh-core/internal/bft/types";
+option go_package = github.com/openmesh-network/core/internal/bft/types";
 
 enum TransactionType {
   NormalTransaction = 0;

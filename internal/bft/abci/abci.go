@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"log"
 	// "math/rand"
-	"openmesh.network/openmesh-core/internal/bft/types"
+	"github.com/openmesh-network/core/internal/bft/types"
 )
 
 type VerificationApp struct {
