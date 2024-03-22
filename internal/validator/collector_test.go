@@ -132,3 +132,30 @@ func TestOpenSea(t *testing.T) {
 		t.Errorf("Expected 100 messages, but received %d", receivedMessages)
 	}
 }
+
+func TestAnkrPolygonJoin(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Log("Got here no issue")
+	t.Log(Sources[4].Topics[0])
+	msgChan, errChan, err := ankrJoinRPC(ctx, Sources[5], Sources[5].Topics[0])
+
+	if err != nil {
+		t.Error(err)
+	} else {
+		for i := 0; i < 100; i++ {
+			select {
+			case <-msgChan:
+			case err := <-errChan:
+				t.Error(err)
+			case <-ctx.Done():
+				t.Log("Context canceled")
+				return
+			}
+		}
+		cancel()
+		t.Log("Stopping...")
+		t.Log("This ran")
+	}
+}
