@@ -1,4 +1,4 @@
-package validator
+package collector
 
 import (
 	"bytes"
@@ -44,8 +44,8 @@ var Sources = [...]Source{
 	{"ethereum-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/eth", []string{""}, ""},
 }
 
-// Subscribe will connect to the chosen source and create a channel to get data out of it.
-func Subscribe(ctx context.Context, source Source, topic string, bufferSizeMax int) (chan []byte, error) {
+// Subscribe will connect to the chosen source and create a channel which will return every message from it.
+func Subscribe(ctx context.Context, source Source, topic string) (chan []byte, error) {
 	// TODO: Not sure if it's better to use a shared buffer here instead of a channel.
 	// That would let us do custom compression behaviour at the exchange level.
 	// If we move to a buffer, using a ring/circular buffer sounds like a good idea.
