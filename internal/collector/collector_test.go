@@ -1,0 +1,4 @@
+package collector
+
+func TestBasic() {
+}
