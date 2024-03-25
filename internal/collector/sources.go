@@ -31,17 +31,21 @@ type Source struct {
 
 // The master table with all our sources.
 var Sources = [...]Source{
-	// Exchanges:
+	// Centralised Exchanges:
 	// Note that the topics are incomplete as they are undecided.
 	{"binance", defaultJoinCEX, "wss://stream.binance.com:9443/ws", []string{"usdt.usdc", "btc.eth", "eth.usdt"}, "{\"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1}"},
 	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"},
 	{"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{topic}}\", \"channel\": \"v3_trades\"}"},
-	// CEX NFT marketplace:
+	// Centralised NFT Exchange:
 	// Opensea Request structure: {topic: \ event: \ payload:{} \ ref: }
 	{"opensea", defaultJoinNFTCEX, "wss://stream.openseabeta.com/socket", []string{"item_listed", "item_cancelled", "item_sold", "item_transferred", "item_received_offer", "item_received_bid"}, "collections:*"},
 
+	// Decentralised Exchanges
+	// Add Uniswap
+
 	// Blockchain RPCs:
 	{"ethereum-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/eth", []string{""}, ""},
+	{"polygon-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/polygon", []string{""}, ""},
 }
 
 // Subscribe will connect to the chosen source and create a channel which will return every message from it.
@@ -151,7 +155,8 @@ func ankrJoinRPC(ctx context.Context, source Source, topic string) (chan []byte,
 				defer cancel()
 				fmt.Println("Waiting for block...")
 				block, err := ethereum_client.BlockByNumber(ctxToPreventHanging, nil)
-				fmt.Println("Got block!")
+				bnumber := block.Number()
+				fmt.Println(fmt.Sprintf("Got block %s!", bnumber))
 
 				if err != nil {
 					errChannel <- err
