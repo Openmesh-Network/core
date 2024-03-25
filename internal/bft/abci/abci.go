@@ -4,17 +4,23 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
+	"math/rand"
+
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/dgraph-io/badger/v3"
 	"google.golang.org/protobuf/proto"
-	"log"
+
 	// "math/rand"
 	"github.com/openmesh-network/core/internal/bft/types"
+	"github.com/openmesh-network/core/internal/collector"
 )
 
 type VerificationApp struct {
 	db           *badger.DB
 	onGoingBlock *badger.Txn
+	col          *collector.CollectorInstance
+	publicKey    []byte
 }
 
 var _ abcitypes.Application = (*VerificationApp)(nil)
@@ -42,14 +48,72 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 		}
 	}
 
-	// Run callback that stops collecting the code, and sends result as a transaction.
 	{
-		//
-	}
+		// Turn hash to 64 bit integer to use as rand seed.
+		var r *rand.Rand
+		{
+			var seed int64
+			hashPrevious := req.GetHash()
+			for i := range hashPrevious {
+				seed ^= int64(hashPrevious[i])
+			}
+			r = rand.New(rand.NewSource(seed))
+		}
 
-	// Determine new order in block deterministically.
-	{
-		//
+		// Not sure what the right number of rounds is :shrug:. Chosing 5 arbitrarily.
+		roundAmount := 5
+
+		// Go through voters and pick set that voted.
+		// NOTE(Tom): This algorithm gives earlier sources higher priority.
+		validatorFreeThisRound := make([]bool, len(req.DecidedLastCommit.Votes))
+		validatorPriorities := make([][]collector.Request, 0, len(req.DecidedLastCommit.Votes))
+		for i := range validatorPriorities {
+			validatorPriorities[i] = make([]collector.Request, 0, roundAmount)
+		}
+
+		for round := 0; round < roundAmount; round++ {
+			for i := range validatorFreeThisRound {
+				validatorFreeThisRound[i] = true
+			}
+
+			for i := range collector.Sources {
+				for j := range collector.Sources[i].Topics {
+					atLeastOneValidatorFree := false
+					for _, free := range validatorFreeThisRound {
+						if free {
+							atLeastOneValidatorFree = true
+						}
+					}
+
+					for atLeastOneValidatorFree {
+						validatorIndex := r.Intn(len(collector.Sources))
+
+						if validatorFreeThisRound[validatorIndex] {
+							validatorFreeThisRound[validatorIndex] = false
+
+							// TODO: Store all of this information.
+							req := collector.Request{
+								Source: collector.Sources[i],
+								Topic:  j,
+							}
+							validatorPriorities[validatorIndex] = append(validatorPriorities[validatorIndex], req)
+
+							break
+						}
+					}
+				}
+			}
+		}
+
+		// Send queue of our own appearances to collector.
+		for i := range validatorPriorities {
+			validator := req.DecidedLastCommit.Votes[i].GetValidator()
+			if bytes.Equal(validator.Address, app.publicKey) {
+				// Submits requests to get the blocks.
+				app.col.SubmitRequests(validatorPriorities[i])
+				break
+			}
+		}
 	}
 
 	return &abcitypes.ResponseFinalizeBlock{
@@ -186,8 +250,8 @@ func (app *VerificationApp) CheckTx(_ context.Context, check *abcitypes.RequestC
 	return &abcitypes.ResponseCheckTx{Code: code}, nil
 }
 
-func NewVerificationApp(db *badger.DB) *VerificationApp {
-	return &VerificationApp{db: db}
+func NewVerificationApp(publicKey []byte, db *badger.DB, collector *collector.CollectorInstance) *VerificationApp {
+	return &VerificationApp{publicKey: publicKey, db: db, col: collector}
 }
 
 func (app *VerificationApp) InitChain(_ context.Context, chain *abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {

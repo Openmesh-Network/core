@@ -2,6 +2,8 @@ package bft
 
 import (
 	"fmt"
+	"os"
+
 	cfg "github.com/cometbft/cometbft/config"
 	cmtflags "github.com/cometbft/cometbft/libs/cli/flags"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
@@ -10,21 +12,22 @@ import (
 	"github.com/cometbft/cometbft/privval"
 	"github.com/cometbft/cometbft/proxy"
 	"github.com/dgraph-io/badger/v3"
-	"github.com/spf13/viper"
 	abci "github.com/openmesh-network/core/internal/bft/abci"
+	"github.com/openmesh-network/core/internal/collector"
 	"github.com/openmesh-network/core/internal/config"
 	"github.com/openmesh-network/core/internal/logger"
-	"os"
+	"github.com/spf13/viper"
 )
 
 // Instance is the CometBFT instance
 type Instance struct {
-	Config  *cfg.Config
-	BftNode *nm.Node
+	Config    *cfg.Config
+	BftNode   *nm.Node
+	Collector *collector.CollectorInstance
 }
 
 // NewInstance initialise a CometBFT instance use the config specified
-func NewInstance(db *badger.DB) (*Instance, error) {
+func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instance, error) {
 	conf := cfg.DefaultConfig()
 	homeDir := config.Config.BFT.HomeDir
 	conf.SetRoot(homeDir)
@@ -43,11 +46,17 @@ func NewInstance(db *badger.DB) (*Instance, error) {
 		return nil, err
 	}
 
-	app := abci.NewVerificationApp(db)
 	pv := privval.LoadFilePV(
 		conf.PrivValidatorKeyFile(),
 		conf.PrivValidatorStateFile(),
 	)
+	publicKey, err := pv.GetPubKey()
+	if err != nil {
+		panic(err)
+	}
+
+	app := abci.NewVerificationApp(publicKey.Bytes(), db, collector)
+
 	nodeKey, err := bftp2p.LoadNodeKey(conf.NodeKeyFile())
 	if err != nil {
 		return nil, err

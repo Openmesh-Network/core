@@ -55,6 +55,7 @@ func (collectorInstance *CollectorInstance) FetchSummaries() []Summary {
 }
 
 func runSubscription(req Request, buffer []byte, summary *Summary, stopChannel chan struct{}) {
+	// XXX: Using context.Background() not ideal according to a senior, might lead to weird bugs.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

@@ -3,16 +3,18 @@ package main
 import (
 	"context"
 	_ "embed"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/openmesh-network/core/internal/bft"
+	"github.com/openmesh-network/core/internal/collector"
 	"github.com/openmesh-network/core/internal/config"
 	"github.com/openmesh-network/core/internal/core"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/internal/networking/p2p"
 	"github.com/openmesh-network/core/updater"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 const (
@@ -59,9 +61,13 @@ func main() {
 		logger.Fatalf("Failed to establish PostgreSQL connection: %s", err.Error())
 	}
 
-	// Initialise CometBFT instance
+	// Need collector before bft.
+	collectorInstance := collector.New()
+	collectorInstance.Start()
+	defer collectorInstance.Stop()
 
-	bftInstance, err := bft.NewInstance(dbInstance.Conn)
+	// Initialise CometBFT instance
+	bftInstance, err := bft.NewInstance(dbInstance.Conn, collectorInstance)
 	if err != nil {
 		logger.Fatalf("Failed to initialise CometBFT instance: %s", err.Error())
 	}
