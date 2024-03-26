@@ -7,12 +7,6 @@ p2p:
   peerLimit: 50
 bft:
   homeDir: /tmp/cometbft-home
-db:
-  username: username
-  password: password
-  port: 5432
-  dbName: nodedata
-  url: 127.0.0.1
 log:
   development: true
   encoding: json
