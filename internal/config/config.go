@@ -12,9 +12,10 @@ var Config config
 
 // config is the configuration structure for the whole Openmesh Core project
 type config struct {
-    P2P P2pConfig `yaml:"p2p"`
-    BFT BFTConfig `yaml:"bft"`
-    Log LogConfig `yaml:"log"`
+    PProf bool      `yaml:"pprof"` // Enable pprof for performance measurement
+    P2P   P2pConfig `yaml:"p2p"`
+    BFT   BFTConfig `yaml:"bft"`
+    Log   LogConfig `yaml:"log"`
 }
 
 // P2pConfig is the configuration for libp2p-related instances

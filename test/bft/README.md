@@ -9,15 +9,35 @@ chmod +x ./build-test.sh
 
 # Start the docker-compose
 docker-compose up
+
+# Or use the docker run command
+docker run --rm -v ./config:/core/conf -v ./dump:/core/dump --name openmesh-core openmesh-core
 ```
 
 ## Configuration file generation
 
-Generate default CometBFT configuration for testing:
+Generate default CometBFT configuration for testing (already included in the Dockerfile):
 
 ```shell
 go run github.com/cometbft/cometbft/cmd/cometbft@v0.38.0 init --home /tmp/cometbft-home
 ```
+
+## Heap dump and performance measurement
+
+Install `cometbft` command for heap dump (already included in the Dockerfile):
+
+```shell
+go install github.com/cometbft/cometbft/cmd/cometbft@latest
+```
+
+Generate heap dump:
+
+```shell
+docker exec -it <name-of-the-container> sh
+cometbft debug dump /core/dump --home=/tmp/cometbft-home
+```
+
+Then you can find the heap dump files (`.zip` archive) under the `dump` directory.
 
 ## Configuration files assignment
 
@@ -25,7 +45,7 @@ go run github.com/cometbft/cometbft/cmd/cometbft@v0.38.0 init --home /tmp/cometb
 
 ## CometBFT log suppression
 
-Use the following command in `Dockerfile` to suppress the CometBFT log to prevent them from spamming the stdout.
+Use the following command in `Dockerfile` to suppress the CometBFT log to prevent them from spamming the stdout (already included in the Dockerfile).
 
 ```shell
 sed -i 's/log_level = "info"/log_level = "error"' /tmp/cometbft-home/config/config.toml

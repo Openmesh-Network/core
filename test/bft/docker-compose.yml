@@ -6,14 +6,17 @@ services:
       replicas: 2
     volumes:
       - ./config:/core/conf
+      - ./dump:/core/dump
     entrypoint: ['/core/openmesh-core', '--config', '/core/conf/config1.yml']
   core-peer-2:
     image: openmesh-core:latest
     volumes:
       - ./config:/core/conf
+      - ./dump:/core/dump
     entrypoint: [ '/core/openmesh-core', '--config', '/core/conf/config2.yml' ]
   core-peer-3:
     image: openmesh-core:latest
     volumes:
       - ./config:/core/conf
+      - ./dump:/core/dump
     entrypoint: [ '/core/openmesh-core', '--config', '/core/conf/config3.yml' ]

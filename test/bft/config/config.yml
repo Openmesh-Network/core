@@ -1,3 +1,4 @@
+pprof: true
 p2p:
   # 0.0.0.0 = localhost
   addr: 0.0.0.0
