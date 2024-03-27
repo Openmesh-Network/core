@@ -24,8 +24,6 @@ go run github.com/cometbft/cometbft/cmd/cometbft@v0.38.0 init --home /tmp/cometb
 
 ## Heap dump and performance measurement
 
-**TODO: The CometBFT command is not generating heap dumps. Need to find out how to "provide profile address".** Reference: [CometBFT Debugging](https://docs.cometbft.com/v0.38/tools/debugging)
-
 Install `cometbft` command for heap dump (already included in the Dockerfile):
 
 ```shell
