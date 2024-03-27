@@ -10,6 +10,7 @@ import (
     "github.com/openmesh-network/core/internal/logger"
     "github.com/openmesh-network/core/internal/networking/p2p"
     "github.com/openmesh-network/core/updater"
+    _ "net/http/pprof"
     "os"
     "os/signal"
     "syscall"

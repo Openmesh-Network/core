@@ -1,3 +1,6 @@
+pprof:
+  enabled: true
+  addr: 127.0.0.1:9082
 p2p:
   # 0.0.0.0 = localhost
   addr: 0.0.0.0

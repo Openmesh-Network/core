@@ -44,3 +44,26 @@ go build -o openmesh-core
       - `p2p/`: P2P networking implementations (based on `libp2p`).
   - `main.go`: The main function.
   - Potential exported (public) libraries.
+
+## PProf Performance Measurement
+
+Enable pprof in the configuration file:
+
+```yaml
+pprof:
+  enabled: true
+  addr: 127.0.0.1:9081
+```
+
+After starting the application, use the following commands to get a heap dump:
+
+```shell
+# Generate heap dump file
+curl http://127.0.0.1:9081/debug/pprof/heap > heap.out
+
+# Generate goroutine dump file (optional)
+curl http://127.0.0.1:9081/debug/pprof/goroutine> goroutine.out
+
+# Open the heap dump in a more human-friendly way
+go tool pprof -http=:9082 heap.out
+```
