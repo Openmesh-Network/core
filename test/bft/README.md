@@ -1,5 +1,16 @@
 # CometBFT Testing (Docker Compose)
 
+## Usage
+
+```shell
+# Build docker image
+chmod +x ./build-test.sh
+./build-test.sh
+
+# Start the docker-compose
+docker-compose up
+```
+
 ## Configuration file generation
 
 Generate default CometBFT configuration for testing:
