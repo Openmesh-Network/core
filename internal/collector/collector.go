@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multicodec"
@@ -26,24 +27,29 @@ type CollectorInstance struct {
 	requestsByPriorityCurrent []Request
 	requestsByPriorityNew     []Request
 	summariesLatest           []Summary
-	requestNotifyChannel      chan struct{}
-	stop                      chan struct{}
+	requestNotifyChannel      chan bool
+	stop                      chan bool
 }
 
-const CONNECTIONS_MAX = 1
+const CONNECTIONS_MAX = 10 
 
 // const BUFFER_SIZE_MAX = 1024
 // const BUFFER_MAX = 1024
 
-func New() CollectorInstance {
-	return CollectorInstance{}
+func New() *CollectorInstance {
+	return &CollectorInstance{
+		requestNotifyChannel: make(chan bool),
+		stop:                 make(chan bool),
+	}
 }
 
 func (collectorInstance *CollectorInstance) SubmitRequests(requestsSortedByPriority []Request) {
 	collectorInstance.requestsByPriorityNew = make([]Request, len(requestsSortedByPriority))
+	collectorInstance.summariesLatest = make([]Summary, len(requestsSortedByPriority))
 
 	copy(collectorInstance.requestsByPriorityNew, requestsSortedByPriority)
-	collectorInstance.requestNotifyChannel <- struct{}{}
+
+	collectorInstance.requestNotifyChannel <- true
 }
 
 // Return latest summaries, wait this is a race condition :facepalm:.
@@ -54,9 +60,10 @@ func (collectorInstance *CollectorInstance) FetchSummaries() []Summary {
 	return collectorInstance.summariesLatest
 }
 
-func runSubscription(req Request, buffer []byte, summary *Summary, stopChannel chan struct{}) {
+func runSubscription(ctx context.Context, req Request, buffer []byte, summary *Summary, stop chan struct{}) {
+	log.Info("Called runSubscription.")
 	// XXX: Using context.Background() not ideal according to a senior, might lead to weird bugs.
-	ctx, cancel := context.WithCancel(context.Background())
+	childrenCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
 	if buffer == nil {
@@ -66,19 +73,22 @@ func runSubscription(req Request, buffer []byte, summary *Summary, stopChannel c
 		panic("Buffer is too small, is this an error?")
 	}
 
-	messageChannel, err := Subscribe(ctx, req.Source, req.Source.Topics[req.Topic])
+	log.Info("About to subscribe to ", req.Source.Name)
+	messageChannel, err := Subscribe(childrenCtx, req.Source, req.Source.Topics[req.Topic])
+	log.Info("Successfuly subscribed to ", req.Source.Name, ", ", req.Source.Topics[req.Topic])
 
 	// TODO: If there's an error connecting to a source tell caller to avoid wasting collector slot on empty data.
 	if err != nil {
-		log.Error(err)
+		// panic(err)
+		<-stop
 		return
 	}
 
 	bufferOffset := 0
 	summary.Request = req
 
-	// XXX: Maybe implement this function in RP?
-	bufferSummaryAppend := func(summary *Summary, buffer []byte, length int) {
+	// XXX: Maybe implement this function in RP? Also it will crash if length == 0
+	summaryAppend := func(summary *Summary, buffer []byte, length int) {
 		// TODO: Consider adding:
 		//	- Timestamp.
 		//	- Fragmentation flag (Whether there is a half message or not).
@@ -97,18 +107,44 @@ func runSubscription(req Request, buffer []byte, summary *Summary, stopChannel c
 		}
 
 		summary.DataHashes = append(summary.DataHashes, c)
+		log.Info("Added ", length, "  bytes, now: "+c.String())
 	}
 
+	var prevMessage []byte
+	printedDebug := false
 	for {
 		select {
-		case <-stopChannel:
+		case <-ctx.Done():
+			log.Info("Context cancelled.")
+			return
+		case <-stop:
+			log.Info("Channel stopped.")
 			// TODO: Flush buffer?
+			if len(buffer) > 0 {
+				summaryAppend(summary, buffer, len(buffer))
+			}
 
-			cancel()
+			log.Info("Gone.")
 			return
 		case message := <-messageChannel:
+			if len(message) == 0 {
+				if !printedDebug {
+					log.Info("Got message with length 0, that means we probs disconnected :(")
+					log.Info("Last message was: ", string(prevMessage))
+				}
+				printedDebug = true
+				break
+			} else {
+				log.Info("Got message: ", len(message))
+				prevMessage = message
+				if len(message) > 100 {
+					log.Info(string(message[:100]))
+				}
+			}
+
 			// Got a message, add it to buffer.
 
+			// log.Info("Went through this part here.")
 			// We do a for loop here because the message itself might be bigger than the total size of the buffer.
 			if bufferOffset+len(message) > len(buffer) {
 				// Buffer would be filled past total size, convert to cid and push to summary pointer.
@@ -117,46 +153,64 @@ func runSubscription(req Request, buffer []byte, summary *Summary, stopChannel c
 				//	Might have to flush the buffer on stopChannel event, to preserve that data.
 
 				// TODO: Add to Resource Pool at this stage?
-				bufferSummaryAppend(summary, buffer, bufferOffset)
+				summaryAppend(summary, buffer, bufferOffset)
 				bufferOffset = 0
 			}
 
+			// log.Info("Went through this part.")
 			// If the message still doesn't fit, divide it into chunks and add it until it fits.
 			for len(message) > len(buffer) {
 				// XXX: Should the cids we post be capped at the length of the buffer?
 				// Or can they be any size? For now I assume they are capped at the size of the buffer.
-				bufferSummaryAppend(summary, message, len(buffer))
+				summaryAppend(summary, message, len(buffer))
 				message = message[len(buffer):]
 			}
 
 			// Add message to buffer.
 			copy(buffer[bufferOffset:], message)
+			// log.Info("Done here.")
 
 			bufferOffset += len(message)
 		}
 	}
 }
 
-func (collectorInstance *CollectorInstance) Start() {
-	collectorInstance.stop = make(chan struct{})
+func (collectorInstance *CollectorInstance) Start(ctx context.Context) {
+	log.Infof("Started collector instance.")
 
 	go func() {
 		// XXX: Might have to remake the waitgroup on every iteration.
 		var wg conc.WaitGroup
-		stopChannel := make(chan struct{})
+
+		subscriptionsCtx, subscriptionsCancel := context.WithCancel(ctx)
+		defer subscriptionsCancel()
+
+		subscriptionStopChannels := make([]chan struct{}, CONNECTIONS_MAX)
+		for i := range subscriptionStopChannels {
+			subscriptionStopChannels[i] = make(chan struct{})
+		}
+		subscriptionCount := 0
+
 		for {
+			log.Infof("Polling..")
 			select {
-			case <-collectorInstance.stop:
-				return
 			case <-collectorInstance.requestNotifyChannel:
+				log.Info("Got new notification...")
 				// Wait for a request to be submitted.
 				// Once they are submitted, we act on it by launching a collector.
 				if collectorInstance.requestsByPriorityNew != nil {
 					// Stop all subscriptions running currently.
 
-					log.Info("Stopping subscriptions...")
-					stopChannel <- struct{}{}
-					// Have to wait here to avoid race condition when touching summariesLatest data.
+					log.Info("Stopping ", subscriptionCount, " subscriptions...")
+
+					// We have to wait for as long as we have subscriptions.
+					for i := 0; i < subscriptionCount; i++ {
+						log.Info("Sending message to channel")
+						subscriptionStopChannels[i] <- struct{}{}
+						log.Info("Canceled subscription")
+					}
+					subscriptionCount = 0
+					log.Info("Waiting now.")
 					wg.Wait()
 
 					log.Info("Stopped subscriptions!")
@@ -170,20 +224,35 @@ func (collectorInstance *CollectorInstance) Start() {
 
 				// Go through all the available connections and launch a new subscription goroutine for each of them.
 				log.Info("Adding sources...")
-				for i := 0; i < CONNECTIONS_MAX; i++ {
+				iterations := min(CONNECTIONS_MAX,
+					len(collectorInstance.requestsByPriorityNew),
+					len(collectorInstance.summariesLatest))
+
+				for i := 0; i < iterations; i++ {
+					log.Info(len(collectorInstance.requestsByPriorityNew), len(collectorInstance.summariesLatest), len(subscriptionStopChannels), i)
 					req := collectorInstance.requestsByPriorityNew[i]
 					buffer := make([]byte, 1024*4)
-					wg.Go(func() { runSubscription(req, buffer, &collectorInstance.summariesLatest[i], stopChannel) })
+
+					stopChannel := subscriptionStopChannels[i]
+					summaryPtr := &collectorInstance.summariesLatest[i]
+
+					runSubscriptionFunc := func() {
+						runSubscription(subscriptionsCtx, req, buffer, summaryPtr, stopChannel)
+					}
+
+					wg.Go(runSubscriptionFunc)
+					// go runSubscriptionFunc()
+					subscriptionCount++
 				}
 
 				// Move new to current.
 				copy(collectorInstance.requestsByPriorityCurrent, collectorInstance.requestsByPriorityNew)
 				collectorInstance.requestsByPriorityNew = nil
+
+			case <-ctx.Done():
+				wg.Wait()
+				return
 			}
 		}
 	}()
-}
-
-func (collectorInstance *CollectorInstance) Stop() {
-	collectorInstance.stop <- struct{}{}
 }

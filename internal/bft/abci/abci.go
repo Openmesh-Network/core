@@ -3,6 +3,7 @@ package verificationApp
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"math/rand"
@@ -56,6 +57,7 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 			hashPrevious := req.GetHash()
 			for i := range hashPrevious {
 				seed ^= int64(hashPrevious[i])
+				seed <<= 8
 			}
 			r = rand.New(rand.NewSource(seed))
 		}
@@ -66,50 +68,79 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 		// Go through voters and pick set that voted.
 		// NOTE(Tom): This algorithm gives earlier sources higher priority.
 		validatorFreeThisRound := make([]bool, len(req.DecidedLastCommit.Votes))
-		validatorPriorities := make([][]collector.Request, 0, len(req.DecidedLastCommit.Votes))
+		validatorPriorities := make([][]collector.Request, len(req.DecidedLastCommit.Votes))
 		for i := range validatorPriorities {
 			validatorPriorities[i] = make([]collector.Request, 0, roundAmount)
 		}
+		log.Println("Started source selection.")
 
-		for round := 0; round < roundAmount; round++ {
+		for round := 0; round < roundAmount && len(validatorPriorities) > 0; round++ {
+			log.Println("Round:", round)
 			for i := range validatorFreeThisRound {
 				validatorFreeThisRound[i] = true
 			}
 
+			r.Shuffle(len(validatorPriorities), func(i, j int) {
+				{
+					temp := validatorFreeThisRound[j]
+					validatorFreeThisRound[j] = validatorFreeThisRound[i]
+					validatorFreeThisRound[i] = temp
+				}
+
+				{
+					temp := validatorPriorities[j]
+					validatorPriorities[j] = validatorPriorities[i]
+					validatorPriorities[i] = temp
+				}
+			})
+
 			for i := range collector.Sources {
 				for j := range collector.Sources[i].Topics {
-					atLeastOneValidatorFree := false
-					for _, free := range validatorFreeThisRound {
-						if free {
-							atLeastOneValidatorFree = true
-						}
-					}
 
-					for atLeastOneValidatorFree {
-						validatorIndex := r.Intn(len(collector.Sources))
+					// If there isn't at least one free validator this round, then we would loop forever.
+					// Hence the check above.
+					for k := range validatorFreeThisRound {
 
-						if validatorFreeThisRound[validatorIndex] {
-							validatorFreeThisRound[validatorIndex] = false
+						if validatorFreeThisRound[k] {
 
-							// TODO: Store all of this information.
-							req := collector.Request{
-								Source: collector.Sources[i],
-								Topic:  j,
+							// Make sure that they're not already assigned to this source.
+							alreadyAssigned := false
+							for _, req := range validatorPriorities[k] {
+								if req.Source.Name == collector.Sources[i].Name && req.Topic == j {
+									// Can't use this guy
+									alreadyAssigned = true
+								}
 							}
-							validatorPriorities[validatorIndex] = append(validatorPriorities[validatorIndex], req)
 
-							break
+							if !alreadyAssigned {
+								validatorFreeThisRound[k] = false
+
+								req := collector.Request{
+									Source: collector.Sources[i],
+									Topic:  j,
+								}
+								validatorPriorities[k] = append(validatorPriorities[k], req)
+
+								log.Println("Found validator for source.")
+								break
+							}
 						}
 					}
 				}
 			}
 		}
 
-		// Send queue of our own appearances to collector.
+		log.Println("Done sorting preferences, submitting our own requests to validator.")
 		for i := range validatorPriorities {
 			validator := req.DecidedLastCommit.Votes[i].GetValidator()
-			if bytes.Equal(validator.Address, app.publicKey) {
+
+			temp := sha256.Sum256(app.publicKey)
+			addr := temp[:20]
+			log.Println(validator.Address, addr)
+
+			if bytes.Equal(validator.Address, addr) {
 				// Submits requests to get the blocks.
+				log.Println("Submitting requests to validator.")
 				app.col.SubmitRequests(validatorPriorities[i])
 				break
 			}

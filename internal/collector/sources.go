@@ -33,19 +33,19 @@ type Source struct {
 var Sources = [...]Source{
 	// Centralised Exchanges:
 	// Note that the topics are incomplete as they are undecided.
-	{"binance", defaultJoinCEX, "wss://stream.binance.com:9443/ws", []string{"usdt.usdc", "btc.eth", "eth.usdt"}, "{\"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1}"},
+	// {"binance", defaultJoinCEX, "wss://stream.binance.com:9443/ws", []string{"btc.usdt"}, "{\"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1}"},
 	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"},
 	{"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{topic}}\", \"channel\": \"v3_trades\"}"},
-	// Centralised NFT Exchange:
-	// Opensea Request structure: {topic: \ event: \ payload:{} \ ref: }
-	{"opensea", defaultJoinNFTCEX, "wss://stream.openseabeta.com/socket", []string{"item_listed", "item_cancelled", "item_sold", "item_transferred", "item_received_offer", "item_received_bid"}, "collections:*"},
+	// // Centralised NFT Exchange:
+	// // Opensea Request structure: {topic: \ event: \ payload:{} \ ref: }
+	// {"opensea", defaultJoinNFTCEX, "wss://stream.openseabeta.com/socket", []string{"item_listed", "item_cancelled", "item_sold", "item_transferred", "item_received_offer", "item_received_bid"}, "collections:*"},
 
-	// Decentralised Exchanges
-	// Add Uniswap
+	// // Decentralised Exchanges
+	// // Add Uniswap
 
-	// Blockchain RPCs:
+	// // Blockchain RPCs:
 	{"ethereum-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/eth", []string{""}, ""},
-	{"polygon-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/polygon", []string{""}, ""},
+	// {"polygon-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/polygon", []string{""}, ""},
 }
 
 // Subscribe will connect to the chosen source and create a channel which will return every message from it.
@@ -95,7 +95,7 @@ func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []by
 	})
 	if err != nil {
 		fmt.Println(resp)
-		panic(err)
+		return nil, nil, err
 	}
 
 	request := strings.Replace(source.Request, "{{topic}}", topic, 1)
@@ -108,13 +108,16 @@ func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []by
 		defer close(msgChannel)
 		defer close(errChannel)
 		for {
-			ntype, n, err := ws.Read(ctx)
-			fmt.Printf("Recieved message of type: %s", ntype)
+			_, n, err := ws.Read(ctx)
+			// fmt.Println("Received message of type: %s", ntype)
 			if err != nil {
+				// fmt.Println("Twas an error message :(")
 				errChannel <- err
 				return
 			} else {
+				// fmt.Println("Writting message...")
 				msgChannel <- n
+				// fmt.Println("Wrote message!")
 			}
 		}
 	}()

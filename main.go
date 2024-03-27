@@ -63,8 +63,7 @@ func main() {
 
 	// Need collector before bft.
 	collectorInstance := collector.New()
-	collectorInstance.Start()
-	defer collectorInstance.Stop()
+	collectorInstance.Start(cancelCtx)
 
 	// Initialise CometBFT instance
 	bftInstance, err := bft.NewInstance(dbInstance.Conn, collectorInstance)

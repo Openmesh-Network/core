@@ -5,6 +5,5 @@ import (
 )
 
 func TestBasic(t *testing.T) {
-	collector := New()
 
 }

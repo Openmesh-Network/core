@@ -15,7 +15,7 @@ import (
 	abci "github.com/openmesh-network/core/internal/bft/abci"
 	"github.com/openmesh-network/core/internal/collector"
 	"github.com/openmesh-network/core/internal/config"
-	"github.com/openmesh-network/core/internal/logger"
+	log "github.com/openmesh-network/core/internal/logger"
 	"github.com/spf13/viper"
 )
 
@@ -31,6 +31,8 @@ func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instan
 	conf := cfg.DefaultConfig()
 	homeDir := config.Config.BFT.HomeDir
 	conf.SetRoot(homeDir)
+
+	log.Info("Loaded config: ", homeDir)
 
 	// Parse CometBFT config
 	bftConf := viper.New()
@@ -90,7 +92,7 @@ func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instan
 func (i *Instance) Start() {
 	go func() {
 		if err := i.BftNode.Start(); err != nil {
-			logger.Fatalf("Failed to start CometBFT node: %s", err.Error())
+			log.Fatalf("Failed to start CometBFT node: %s", err.Error())
 		}
 	}()
 }
