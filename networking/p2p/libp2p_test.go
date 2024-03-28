@@ -12,7 +12,7 @@ import (
 func TestPublish(t *testing.T) {
 	config.ParseFlags()
 	config.Path = "../../../"
-	config.ParseConfig()
+	config.ParseConfig(config.Path, true)
 
 	c, cancel := context.WithCancel(context.Background())
 	defer cancel()
