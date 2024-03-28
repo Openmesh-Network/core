@@ -12,7 +12,7 @@ import (
 	"github.com/openmesh-network/core/internal/core"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
-	"github.com/openmesh-network/core/internal/networking/p2p"
+	"github.com/openmesh-network/core/networking/p2p"
 	"github.com/openmesh-network/core/updater"
 )
 
