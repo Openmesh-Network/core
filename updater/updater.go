@@ -23,7 +23,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/multiformats/go-multiaddr"
-    "github.com/openmesh-network/core/internal/networking/p2p"
+	"github.com/openmesh-network/core/networking/p2p"
 
 	"github.com/ipfs/boxo/blockservice"
 	blockstore "github.com/ipfs/boxo/blockstore"
