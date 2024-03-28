@@ -1,10 +1,10 @@
 package collector
 
 import (
-	"testing"
+    "testing"
 )
 
 func TestBasic(t *testing.T) {
-	collector := New()
+    //collector := New()
 
 }

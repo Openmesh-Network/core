@@ -36,3 +36,6 @@ executable-file
 /ignore
 /internal/collector/.env
 log.txt
+
+# Get rid of logs
+logs
