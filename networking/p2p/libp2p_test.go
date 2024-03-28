@@ -11,17 +11,17 @@ import (
 
 func TestPublish(t *testing.T) {
 	config.ParseFlags()
-	config.Path = "../../../"
+	config.Path = "../../"
 	config.ParseConfig(config.Path, true)
 
 	c, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	p, err := NewInstance(c).Build()
+	p, err := NewInstance(c, config.Config.P2P).Build()
 	assert.NoError(t, err)
 	err = p.Start()
 	assert.NoError(t, err)
 
-	s, err := NewInstance(c).Build()
+	s, err := NewInstance(c, config.Config.P2P).Build()
 	assert.NoError(t, err)
 	err = s.Start()
 	assert.NoError(t, err)
@@ -56,3 +56,5 @@ func TestPublish(t *testing.T) {
 	// Wait for receiving message
 	time.Sleep(5 * time.Second)
 }
+
+// NOTE: no test for function NewDefaultP2PHost()
