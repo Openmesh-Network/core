@@ -90,11 +90,11 @@ func Subscribe(ctx context.Context, source Source, topic string) (chan []byte, e
 }
 
 func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
-	ws, resp, err := websocket.Dial(ctx, source.ApiURL, &websocket.DialOptions{
+	ws, _, err := websocket.Dial(ctx, source.ApiURL, &websocket.DialOptions{
 		Subprotocols: []string{"phoenix"},
 	})
 	if err != nil {
-		fmt.Println(resp)
+		// fmt.Println(resp)
 		return nil, nil, err
 	}
 
@@ -156,10 +156,10 @@ func ankrJoinRPC(ctx context.Context, source Source, topic string) (chan []byte,
 				// actually error on the state of the request, not the parent's context.
 				ctxToPreventHanging, cancel := context.WithTimeout(context.Background(), time.Second*2)
 				defer cancel()
-				fmt.Println("Waiting for block...")
+				// fmt.Println("Waiting for block...")
 				block, err := ethereum_client.BlockByNumber(ctxToPreventHanging, nil)
-				bnumber := block.Number()
-				fmt.Println(fmt.Sprintf("Got block %s!", bnumber))
+				// bnumber := block.Number()
+				// fmt.Println(fmt.Sprintf("Got block %s!", bnumber))
 
 				if err != nil {
 					errChannel <- err

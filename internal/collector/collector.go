@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multicodec"
@@ -19,52 +18,96 @@ type Summary struct {
 	Request Request
 	// XXX: This might not be efficient, array of pointers means many cache misses.
 	// Not sure if the Go compiler will realize we want these sequentially in memory.
+	// But whatever man we're doing like 1-5 of these a second.
 	DataHashes []cid.Cid
 }
 
-type CollectorInstance struct {
-	// Lower in the queue is higher priority
-	requestsByPriorityCurrent []Request
-	requestsByPriorityNew     []Request
-	summariesLatest           []Summary
-	requestNotifyChannel      chan bool
-	stop                      chan bool
+type CollectorWorker struct {
+	summary *Summary
+	request Request
+	message chan []byte
+
+	// Could make these into the same functoin.
+	pause  chan bool
+	resume chan bool
 }
 
-const CONNECTIONS_MAX = 10 
+const CONNECTIONS_MAX = 1
+
+type CollectorInstance struct {
+	// Lower in the queue is higher priority
+	ctx                       context.Context
+	workers                   [CONNECTIONS_MAX]CollectorWorker
+	workerWaitGroup           conc.WaitGroup
+	requestsByPriorityCurrent []Request
+	requestsByPriorityNew     []Request
+	summariesNew              [CONNECTIONS_MAX]Summary
+	summariesOld              [CONNECTIONS_MAX]Summary
+	subscriptionsContext      context.Context
+	subscriptionsCancel       context.CancelFunc
+}
 
 // const BUFFER_SIZE_MAX = 1024
 // const BUFFER_MAX = 1024
 
 func New() *CollectorInstance {
-	return &CollectorInstance{
-		requestNotifyChannel: make(chan bool),
-		stop:                 make(chan bool),
+	return &CollectorInstance{}
+}
+
+func (ci *CollectorInstance) SubmitRequests(requestsSortedByPriority []Request) []Summary {
+	// XXX: Wasteful, shouldn't have to remake but whatever.
+	ci.requestsByPriorityNew = make([]Request, len(requestsSortedByPriority))
+
+	copy(ci.requestsByPriorityNew, requestsSortedByPriority)
+
+	if ci.subscriptionsCancel != nil {
+		ci.subscriptionsCancel()
 	}
+
+	ci.subscriptionsContext, ci.subscriptionsCancel = context.WithCancel(ci.ctx)
+
+	log.Info("Pausing workers")
+	for i := range ci.workers {
+		log.Info("Pausing worker ", i)
+		// This should flush the summary buffer
+		ci.workers[i].pause <- true
+	}
+
+	// Now the old summaries are up to date.
+	copy(ci.summariesOld[:], ci.summariesNew[:])
+
+	log.Info("Subscribing to requests.")
+	for i := 0; i < min(len(ci.workers), len(requestsSortedByPriority)); i++ {
+		r := requestsSortedByPriority[i]
+
+		// Subscribe to new source.
+		// TODO: If a worker is already subscribed to a source don't end the subscription.
+		// Significant rewrite, but might improve performance.
+		log.Info("Subscribing ", i)
+		messageChannel, err := Subscribe(ci.subscriptionsContext, r.Source, r.Source.Topics[r.Topic])
+		if err != nil {
+			// XXX: Handle this case by skipping this request.
+		}
+
+		ci.workers[i].summary.Request = r
+		ci.workers[i].message = messageChannel
+	}
+
+	for i := range ci.workers {
+		// Now unpause.
+		log.Info("Resuming ", i)
+		ci.workers[i].resume <- true
+	}
+
+	// Go through new requests, ideal becaviour:
+	//	- If a worker is already subscribed then skip. (Not doing this to begin with to keep it simple)
+	//	- Otherwise subscribe to the new request and flip.
+
+	return ci.summariesOld[:min(len(ci.summariesOld), len(requestsSortedByPriority))]
 }
 
-func (collectorInstance *CollectorInstance) SubmitRequests(requestsSortedByPriority []Request) {
-	collectorInstance.requestsByPriorityNew = make([]Request, len(requestsSortedByPriority))
-	collectorInstance.summariesLatest = make([]Summary, len(requestsSortedByPriority))
-
-	copy(collectorInstance.requestsByPriorityNew, requestsSortedByPriority)
-
-	collectorInstance.requestNotifyChannel <- true
-}
-
-// Return latest summaries, wait this is a race condition :facepalm:.
-func (collectorInstance *CollectorInstance) FetchSummaries() []Summary {
-	// We could tell the collector to run the .
-	// TODO: Add a mutex here.
-
-	return collectorInstance.summariesLatest
-}
-
-func runSubscription(ctx context.Context, req Request, buffer []byte, summary *Summary, stop chan struct{}) {
-	log.Info("Called runSubscription.")
-	// XXX: Using context.Background() not ideal according to a senior, might lead to weird bugs.
-	childrenCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
+func (cw *CollectorWorker) run(ctx context.Context, buffer []byte) {
+	log.Info("Started worker.")
 
 	if buffer == nil {
 		panic("Buffer is nil dummy.")
@@ -72,20 +115,6 @@ func runSubscription(ctx context.Context, req Request, buffer []byte, summary *S
 	if len(buffer) < 100 {
 		panic("Buffer is too small, is this an error?")
 	}
-
-	log.Info("About to subscribe to ", req.Source.Name)
-	messageChannel, err := Subscribe(childrenCtx, req.Source, req.Source.Topics[req.Topic])
-	log.Info("Successfuly subscribed to ", req.Source.Name, ", ", req.Source.Topics[req.Topic])
-
-	// TODO: If there's an error connecting to a source tell caller to avoid wasting collector slot on empty data.
-	if err != nil {
-		// panic(err)
-		<-stop
-		return
-	}
-
-	bufferOffset := 0
-	summary.Request = req
 
 	// XXX: Maybe implement this function in RP? Also it will crash if length == 0
 	summaryAppend := func(summary *Summary, buffer []byte, length int) {
@@ -110,75 +139,104 @@ func runSubscription(ctx context.Context, req Request, buffer []byte, summary *S
 		log.Info("Added ", length, "  bytes, now: "+c.String())
 	}
 
-	var prevMessage []byte
+	bufferOffset := 0
 	printedDebug := false
+	paused := false
+	log.Info("Running for loop.")
 	for {
-		select {
-		case <-ctx.Done():
-			log.Info("Context cancelled.")
-			return
-		case <-stop:
-			log.Info("Channel stopped.")
-			// TODO: Flush buffer?
-			if len(buffer) > 0 {
-				summaryAppend(summary, buffer, len(buffer))
-			}
-
-			log.Info("Gone.")
-			return
-		case message := <-messageChannel:
-			if len(message) == 0 {
-				if !printedDebug {
-					log.Info("Got message with length 0, that means we probs disconnected :(")
-					log.Info("Last message was: ", string(prevMessage))
-				}
-				printedDebug = true
+		log.Info("Polling.")
+		if paused {
+			select {
+			case <-ctx.Done():
+				// XXX: This is duplicated, not sure if there's a simple way to handle this.
+				log.Info("Context cancelled.")
+				return
+			case <-cw.resume:
+				log.Info("Worker resumed.")
+				paused = false
 				break
-			} else {
-				log.Info("Got message: ", len(message))
-				prevMessage = message
-				if len(message) > 100 {
-					log.Info(string(message[:100]))
+			}
+		} else {
+			select {
+			case <-ctx.Done():
+				log.Info("Context cancelled.")
+				return
+			case <-cw.pause:
+				log.Info("Channel stopped.")
+
+				// Flush the buffer!
+				if len(buffer) > 0 {
+					summaryAppend(cw.summary, buffer, len(buffer))
 				}
+
+				// Wait until resume.
+				log.Info("Worker paused until resume is called.")
+				paused = true
+				break
+			case message := <-cw.message:
+				if len(message) == 0 {
+					if !printedDebug {
+						log.Info("Got message with length 0, that means we probs disconnected :(")
+						// log.Info("Last message was: ", string(prevMessage))
+					}
+					printedDebug = true
+					break
+				} else {
+					// log.Info("Got message: ", len(message))
+					// prevMessage = message
+					// if len(message) > 100 {
+					// 	log.Info(string(message[:100]))
+					// }
+				}
+
+				// Got a message, add it to buffer.
+
+				// log.Info("Went through this part here.")
+				// We do a for loop here because the message itself might be bigger than the total size of the buffer.
+				if bufferOffset+len(message) > len(buffer) {
+
+					// TODO: Add to Resource Pool at this stage?
+					summaryAppend(cw.summary, buffer, bufferOffset)
+					bufferOffset = 0
+				}
+
+				// log.Info("Went through this part.")
+				// If the message still doesn't fit, divide it into chunks and add it until it fits.
+				for len(message) > len(buffer) {
+					// XXX: Should the cids we post be capped at the length of the buffer?
+					// Or can they be any size? For now I assume they are capped at the size of the buffer.
+					// Do we do padding? Need a spreadsheet to test this.
+					summaryAppend(cw.summary, message, len(buffer))
+					message = message[len(buffer):]
+				}
+
+				// Add message to buffer.
+				copy(buffer[bufferOffset:], message)
+				// log.Info("Done here.")
+
+				bufferOffset += len(message)
 			}
-
-			// Got a message, add it to buffer.
-
-			// log.Info("Went through this part here.")
-			// We do a for loop here because the message itself might be bigger than the total size of the buffer.
-			if bufferOffset+len(message) > len(buffer) {
-				// Buffer would be filled past total size, convert to cid and push to summary pointer.
-				// This might introduce a problem. Lets say we store 1kb buffer:
-				//	If a source puts out less than 1kb per blocktime, then it won't get registered at all!
-				//	Might have to flush the buffer on stopChannel event, to preserve that data.
-
-				// TODO: Add to Resource Pool at this stage?
-				summaryAppend(summary, buffer, bufferOffset)
-				bufferOffset = 0
-			}
-
-			// log.Info("Went through this part.")
-			// If the message still doesn't fit, divide it into chunks and add it until it fits.
-			for len(message) > len(buffer) {
-				// XXX: Should the cids we post be capped at the length of the buffer?
-				// Or can they be any size? For now I assume they are capped at the size of the buffer.
-				summaryAppend(summary, message, len(buffer))
-				message = message[len(buffer):]
-			}
-
-			// Add message to buffer.
-			copy(buffer[bufferOffset:], message)
-			// log.Info("Done here.")
-
-			bufferOffset += len(message)
 		}
 	}
 }
 
-func (collectorInstance *CollectorInstance) Start(ctx context.Context) {
+func (ci *CollectorInstance) Start(ctx context.Context) {
 	log.Infof("Started collector instance.")
+	ci.ctx = ctx
 
-	go func() {
+	for i := range ci.workers {
+		buffer := make([]byte, 4096)
+		ci.workers[i].pause = make(chan bool)
+		ci.workers[i].resume = make(chan bool)
+		ci.workers[i].message = make(chan []byte)
+		ci.workers[i].summary = &ci.summariesNew[i]
+		runFunc := func() { ci.workers[i].run(ci.ctx, buffer) }
+
+		log.Infof("Deploying worker for collector.")
+		ci.workerWaitGroup.Go(runFunc)
+	}
+
+	/* go func() {
 		// XXX: Might have to remake the waitgroup on every iteration.
 		var wg conc.WaitGroup
 
@@ -254,5 +312,10 @@ func (collectorInstance *CollectorInstance) Start(ctx context.Context) {
 				return
 			}
 		}
-	}()
+	}() */
+}
+
+func (ci *CollectorInstance) Stop() {
+	// This only works if the context was cancelled, otherwise the worker goroutines will block this.
+	ci.workerWaitGroup.Wait()
 }

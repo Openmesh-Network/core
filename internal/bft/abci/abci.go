@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"log"
 	"math/rand"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
@@ -15,6 +14,7 @@ import (
 	// "math/rand"
 	"github.com/openmesh-network/core/internal/bft/types"
 	"github.com/openmesh-network/core/internal/collector"
+	log "github.com/openmesh-network/core/internal/logger"
 )
 
 type VerificationApp struct {
@@ -32,18 +32,18 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 	app.onGoingBlock = app.db.NewTransaction(true)
 	for i, tx := range req.Txs {
 		if code := app.isValid(tx); code != 0 {
-			log.Printf("Error: invalid transaction index %v", i)
+			log.Warn("Error: invalid transaction index %v", i)
 			txs[i] = &abcitypes.ExecTxResult{Code: code}
 		} else {
 			parts := bytes.SplitN(tx, []byte("="), 2)
 			key, value := parts[0], parts[1]
-			log.Printf("Adding key %s with value %s", key, value)
+			log.Info("Adding key %s with value %s", key, value)
 
 			if err := app.onGoingBlock.Set(key, value); err != nil {
 				log.Panicf("Error writing to database, unable to execute tx: %v", err)
 			}
 
-			log.Printf("Successfully added key %s with value %s", key, value)
+			log.Info("Successfully added key %s with value %s", key, value)
 
 			txs[i] = &abcitypes.ExecTxResult{}
 		}
@@ -62,8 +62,8 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 			r = rand.New(rand.NewSource(seed))
 		}
 
-		// Not sure what the right number of rounds is :shrug:. Chosing 5 arbitrarily.
-		roundAmount := 5
+		// Not sure what the right number of rounds is :shrug:. Chosing arbitrarily.
+		roundAmount := 10
 
 		// Go through voters and pick set that voted.
 		// NOTE(Tom): This algorithm gives earlier sources higher priority.
@@ -72,10 +72,10 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 		for i := range validatorPriorities {
 			validatorPriorities[i] = make([]collector.Request, 0, roundAmount)
 		}
-		log.Println("Started source selection.")
+		log.Info("Started source selection.")
 
 		for round := 0; round < roundAmount && len(validatorPriorities) > 0; round++ {
-			log.Println("Round:", round)
+			log.Info("Round:", round)
 			for i := range validatorFreeThisRound {
 				validatorFreeThisRound[i] = true
 			}
@@ -121,7 +121,7 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 								}
 								validatorPriorities[k] = append(validatorPriorities[k], req)
 
-								log.Println("Found validator for source.")
+								log.Info("Found validator for source.")
 								break
 							}
 						}
@@ -130,21 +130,32 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 			}
 		}
 
-		log.Println("Done sorting preferences, submitting our own requests to validator.")
+		log.Info("Done sorting preferences, submitting our own requests to validator.")
 		for i := range validatorPriorities {
 			validator := req.DecidedLastCommit.Votes[i].GetValidator()
 
 			temp := sha256.Sum256(app.publicKey)
 			addr := temp[:20]
-			log.Println(validator.Address, addr)
+			log.Info(validator.Address, addr)
 
 			if bytes.Equal(validator.Address, addr) {
 				// Submits requests to get the blocks.
-				log.Println("Submitting requests to validator.")
+				log.Info("Submitting requests to validator.")
+
+				// This will block:
 				app.col.SubmitRequests(validatorPriorities[i])
 				break
 			}
 		}
+
+		/*
+			if summary != nil {
+				Turn the summary to unified format and send as a transaction
+			}
+
+			Next, I need to go above, sort the transactions by rank, and log them on the blockchain.
+
+		*/
 	}
 
 	return &abcitypes.ResponseFinalizeBlock{
