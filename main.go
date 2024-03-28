@@ -73,7 +73,7 @@ func main() {
 
 	// Build and start top-level instance.
 	ins := core.NewInstance().
-		SetP2pInstance(p2pInstance).
+		SetP2pInstance(p2pInstance, config.P2pConfig).
 		SetDBInstance(dbInstance).
 		SetBFTInstance(bftInstance)
 	ins.Start()
