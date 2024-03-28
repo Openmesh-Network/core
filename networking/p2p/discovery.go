@@ -16,9 +16,3 @@ func (d *PeerDiscovery) HandlePeerFound(p peer.AddrInfo) {
 func NewPeerDiscovery() *PeerDiscovery {
 	return &PeerDiscovery{NewPeers: make(chan peer.AddrInfo)}
 }
-
-// Connect to bootstrap,
-func bootStrap(target string) PeerDiscovery {
-	// nft_handshake(target)
-	return *NewPeerDiscovery()
-}
