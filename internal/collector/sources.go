@@ -38,12 +38,23 @@ var Sources = [...]Source{
     {"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{topic}}\", \"channel\": \"v3_trades\"}"},
 
     // Bybit
-    {"bybit", defaultJoinCEX,
+    {
+        "bybit",
+        defaultJoinCEX,
         "wss://stream.bybit.com/v5/public/spot",
         []string{"orderbook.50.BTCUSDT", "publicTrade.BTCUSDT", "tickers.BTCUSDT", "kline.M.BTCUSDT"},
         `{"op": "subscribe","args": ["{{topic}}"]}`,
     },
+
     // OKX
+    // https://www.okx.com/docs-v5/en/#spread-trading-websocket-public-channel
+    {
+        "okx",
+        okxJoinCEX,
+        "wss://ws.okx.com:8443/ws/v5/business",
+        []string{"sprd-bbo-tbt", "sprd-books5", "sprd-public-trades", "sprd-tickers"},
+        `{"op": "subscribe","args": [{"channel": "{{topic}}","sprdId": "BTC-USDT_BTC-USDT-SWAP"}]}`,
+    },
 
     // Centralised NFT Exchange:
     // Opensea Request structure: {topic: \ event: \ payload:{} \ ref: }
@@ -113,6 +124,47 @@ func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []by
 
     request := strings.Replace(source.Request, "{{topic}}", topic, 1)
     ws.Write(ctx, websocket.MessageBinary, []byte(request))
+
+    msgChannel := make(chan []byte)
+    errChannel := make(chan error, 1)
+
+    go func() {
+        defer close(msgChannel)
+        defer close(errChannel)
+        for {
+            ntype, n, err := ws.Read(ctx)
+            fmt.Printf("Recieved message of type: %s", ntype)
+            if err != nil {
+                errChannel <- err
+                return
+            } else {
+                msgChannel <- n
+            }
+        }
+    }()
+
+    go func() {
+        <-ctx.Done()
+        ws.CloseNow()
+    }()
+    return msgChannel, errChannel, nil
+}
+
+// OKS's WebSocket API requires websocket.MessageText (instead of websocket.Binary),
+// so this should be a separate function
+func okxJoinCEX(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
+    ws, _, err := websocket.Dial(ctx, source.ApiURL, &websocket.DialOptions{
+        Subprotocols: []string{"phoenix"},
+    })
+    if err != nil {
+        panic(err)
+    }
+
+    request := strings.Replace(source.Request, "{{topic}}", topic, 1)
+    err = ws.Write(ctx, websocket.MessageText, []byte(request))
+    if err != nil {
+        panic(err)
+    }
 
     msgChannel := make(chan []byte)
     errChannel := make(chan error, 1)

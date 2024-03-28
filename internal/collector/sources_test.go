@@ -123,6 +123,32 @@ func TestByBit(t *testing.T) {
     }
 }
 
+func TestOKX(t *testing.T) {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    t.Log("Running OKX collector!!!")
+    t.Log(Sources[4].Topics[1])
+    msgChan, errChan, err := Sources[4].JoinFunc(ctx, Sources[4], Sources[4].Topics[1])
+
+    if err != nil {
+        t.Error(err)
+    } else {
+        for i := 0; i < 100; i++ {
+            select {
+            case msg := <-msgChan:
+                t.Log(string(msg))
+            case err := <-errChan:
+                t.Error(err)
+            case <-ctx.Done():
+                t.Log("Context canceled")
+                return
+            }
+        }
+        cancel()
+    }
+}
+
 func TestOpenSea(t *testing.T) {
     // Note(Tom): Have to disable this test since I don't have Opensea Creds.
 
