@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	_ "embed"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/openmesh-network/core/internal/bft"
 	"github.com/openmesh-network/core/internal/config"
 	"github.com/openmesh-network/core/internal/core"
@@ -10,9 +14,6 @@ import (
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/internal/networking/p2p"
 	"github.com/openmesh-network/core/updater"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 const (

@@ -34,4 +34,5 @@ go.work
 executable-file
 
 /ignore
-/internal/validator/.env
+/internal/collector/.env
+log.txt
