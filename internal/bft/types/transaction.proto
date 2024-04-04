@@ -1,10 +1,11 @@
 syntax = "proto3";
-option go_package = "openmesh.network/openmesh-core/internal/bft/types";
+option go_package = "openmesh-node/internal/types";
 
 enum TransactionType {
   NormalTransaction = 0;
   VerificationTransaction = 1;
   ResourceTransaction = 2;
+  NodeRegistrationTransaction = 3;
 }
 
 message VerificationTransactionData {
@@ -14,27 +15,31 @@ message VerificationTransactionData {
   int64 timestamp = 4;
 }
 
-
 message ResourceTransactionData {
-  double total_resources = 1;
-  double rewarded_resources = 2;
+  double totalResources = 1;
+  double rewardedResources = 2;
 }
-
 
 message NormalTransactionData {
-  double transaction_amount = 1;
-  string sent_to = 2;
+  double transactionAmount = 1;
+  string sentTo = 2;
 }
 
+// Node Registration Transaction Data
+message NodeRegistrationTransactionData {
+  string nodeAddress = 1;
+  string nodeAttestation = 2;
+  string nodeSignature = 3;
+}
 
 message Transaction {
   string owner = 1;
   string signature = 2;
   TransactionType type = 3;
   oneof data {
-    bytes raw_data = 5;
-    VerificationTransactionData verification_data = 6;
-    ResourceTransactionData resource_data = 7;
-    NormalTransactionData normal_data = 8;
+    VerificationTransactionData verificationData = 4; 
+    ResourceTransactionData resourceData = 5; 
+    NormalTransactionData normalData = 6; 
+    NodeRegistrationTransactionData nodeRegistrationData = 7; 
   }
 }
