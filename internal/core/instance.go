@@ -38,10 +38,10 @@ func (i *Instance) SetBFTInstance(bft *bft.Instance) *Instance {
 
 // Start the top-level instance as well as all the low-level instances
 func (i *Instance) Start(ctx context.Context) {
-	err := i.pi.Start()
-	if err != nil {
-		logger.Fatalf("Failed to start p2p instance: %s", err.Error())
-	}
+	// err := i.pi.Start()
+	// if err != nil {
+	// 	logger.Fatalf("Failed to start p2p instance: %s", err.Error())
+	// }
 
 	i.BFT.Start(ctx)
 }

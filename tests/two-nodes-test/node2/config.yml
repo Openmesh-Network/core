@@ -1,0 +1,36 @@
+p2p:
+  # 0.0.0.0 = localhost
+  addr: 0.0.0.0
+  # 0 = random port
+  port: 0
+  groupName: xnode
+  peerLimit: 50
+bft:
+  homeDir: cbft-home
+db:
+  username: username
+  password: password
+  port: 5432
+  dbName: nodedata
+  url: 127.0.0.1
+log:
+  development: true
+  encoding: json
+  info:
+    toStdout: true
+    toFile: true
+    fileName: logs/core-info.log
+    maxSize: 10
+    maxAge: 7
+    maxBackups: 10
+  error:
+    toStderr: true
+    toFile: true
+    fileName: logs/core-error.log
+    maxSize: 10
+    maxAge: 7
+    maxBackups: 10
+nft:
+  trackerData: ./cbft/data/nft-tracked
+  rpcAddress: https://rpc.ankr.com/eth_sepolia
+  unlimitedRPC: false

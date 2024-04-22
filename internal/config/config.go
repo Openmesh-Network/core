@@ -71,25 +71,24 @@ type CollectorConfig struct {
 }
 
 // ParseConfig parses the yml configuration file and initialise the Config variable
-func ParseConfig(configAtCompileTime string, allowRuntimeConfigFile bool) {
+func ParseConfig(configAtCompileTime string, useRuntimeConfigFile bool) {
 	coreConf := viper.New()
 
-	if Name == "" {
+	if !useRuntimeConfigFile {
 		r := strings.NewReader(configAtCompileTime)
 		if err := coreConf.ReadConfig(r); err != nil {
 			// This should NEVER run! We can't allow faulty configs to be compiled to the executable.
 			panic(err)
 		}
-	} else if allowRuntimeConfigFile {
+	} else  {
 		coreConf.AddConfigPath(Path)
 		coreConf.SetConfigName(Name)
 		coreConf.SetConfigType("yaml")
+
 		if err := coreConf.ReadInConfig(); err != nil {
 			log.Fatalf("Failed to read the configuration: %s", err.Error())
 		}
-	} else {
-		log.Fatalf("No config file found in compiled binary and no runtime config file allowed.")
-	}
+	} 
 
 	if err := coreConf.Unmarshal(&Config); err != nil {
 		log.Fatalf("Failed to parse the configuration: %s", err.Error())

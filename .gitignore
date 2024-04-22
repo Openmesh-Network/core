@@ -31,12 +31,6 @@ go.work
 
 # Secrets & blockchain data
 /collector/.env
-cbft-home/data
-cbft-home/config/node_key.json
-cbft-home/config/priv_validator_key.json
-cbft-home/config/addrbook.json
-cbft-home/config/genesis.json
-
 
 # Arbitrary trashes
 .DS_Store
@@ -54,4 +48,6 @@ log.txt
 /default-cometbft-home/config/priv_validator_key.json
 # Get rid of logs
 logs
-Test
+
+# Get rid of cbft-data
+/cbft-home

@@ -1,12 +1,8 @@
 package verificationApp
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
-	"math/rand"
-	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/dgraph-io/badger/v3"
@@ -43,6 +39,8 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 
 	// Only accept transactions that fit in the correct order?
 
+	// Will currently accept all transactions.
+
 	return &abcitypes.ResponsePrepareProposal{Txs: proposal.Txs}, nil
 }
 func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
@@ -53,55 +51,20 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 	return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_ACCEPT}, nil
 }
 
-func (app VerificationApp) Commit(_ context.Context, commit *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
-	return &abcitypes.ResponseCommit{}, app.onGoingBlock.Commit()
-}
-
-func (app *VerificationApp) ListSnapshots(_ context.Context, snapshots *abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
-	return &abcitypes.ResponseListSnapshots{}, nil
-}
-
-func (app *VerificationApp) OfferSnapshot(_ context.Context, snapshot *abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
-	return &abcitypes.ResponseOfferSnapshot{}, nil
-}
-
-func (app *VerificationApp) LoadSnapshotChunk(_ context.Context, chunk *abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
-	return &abcitypes.ResponseLoadSnapshotChunk{}, nil
-}
-
-func (app *VerificationApp) ApplySnapshotChunk(_ context.Context, chunk *abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
-	return &abcitypes.ResponseApplySnapshotChunk{Result: abcitypes.ResponseApplySnapshotChunk_ACCEPT}, nil
-}
-
-func (app VerificationApp) ExtendVote(_ context.Context, extend *abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
-	return &abcitypes.ResponseExtendVote{}, nil
-}
-
-func (app *VerificationApp) VerifyVoteExtension(_ context.Context, verify *abcitypes.RequestVerifyVoteExtension) (*abcitypes.ResponseVerifyVoteExtension, error) {
-	return &abcitypes.ResponseVerifyVoteExtension{}, nil
-}
-
-func (app *VerificationApp) Info(_ context.Context, info *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
-	return &abcitypes.ResponseInfo{}, nil
-}
 func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
 	var txs = make([]*abcitypes.ExecTxResult, len(req.Txs))
-	log.Debug("Finalizing block ", time.Now().Unix())
 
 	app.onGoingBlock = app.db.NewTransaction(true)
 	var validatorupdates = make([]abcitypes.ValidatorUpdate, 0, len(req.Txs))
 
 	for i, tx := range req.Txs {
 		if code := app.isValid(tx); code != 0 {
-			log.Error("Error: invalid transaction index %v", i)
+			// log.Error("Error: invalid transaction index %v", i)
 			txs[i] = &abcitypes.ExecTxResult{Code: code}
 		} else {
 			var transaction types.Transaction
-			// hexString := string(tx)
-			// tx, _ = hex.DecodeString(hexString)
-			log.Debug("Transaction hex ", string(tx))
 			err := proto.Unmarshal(tx, &transaction)
-			log.Debug("Transaction hex ", transaction.Type.Number())
+
 			if err != nil {
 				log.Error("Error unmarshaling transaction data:", err)
 				txs[i] = &abcitypes.ExecTxResult{Code: 1}
@@ -111,7 +74,7 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 			case types.TransactionType_NormalTransaction:
 				normalData := &types.NormalTransactionData{}
 				normalData = transaction.GetNormalData()
-				log.Debug("Resource Transaction Data:", transaction)
+				// log.Debug("Resource Transaction Data:", transaction)
 				if normalData == nil {
 					log.Error("Error: Normal Data is nil %v", i)
 					txs[i] = &abcitypes.ExecTxResult{Code: 1}
@@ -122,7 +85,7 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 					txs[i] = &abcitypes.ExecTxResult{Code: 1}
 				}
 				txs[i] = &abcitypes.ExecTxResult{}
-				log.Debug("Normal Transaction Data:", normalData)
+				// log.Debug("Normal Transaction Data:", normalData)
 			case types.TransactionType_VerificationTransaction:
 				verificationData := &types.VerificationTransactionData{}
 				verificationData = transaction.GetVerificationData()
@@ -131,17 +94,17 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 					txs[i] = &abcitypes.ExecTxResult{Code: 1}
 				}
 				res := app.handleVerificationTransaction(*verificationData)
-				log.Debug("Handle transaction recieved")
+				// log.Debug("Handle transaction recieved")
 				if res != 0 {
 					log.Error("Error: invalid transaction index %v", i)
 					txs[i] = &abcitypes.ExecTxResult{Code: 1}
 				}
 				txs[i] = &abcitypes.ExecTxResult{}
-				log.Debug("Verification Transaction Data:", verificationData)
+				// log.Debug("Verification Transaction Data:", verificationData)
 			case types.TransactionType_ResourceTransaction:
 				resourceData := &types.ResourceTransactionData{}
 				resourceData = transaction.GetResourceData()
-				log.Debug("Resource Transaction Data:", transaction)
+				// log.Debug("Resource Transaction Data:", transaction)
 				if err != nil {
 					log.Error("Error: invalid transaction index %v", i)
 					txs[i] = &abcitypes.ExecTxResult{Code: 1}
@@ -152,11 +115,12 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 					txs[i] = &abcitypes.ExecTxResult{Code: 1}
 				}
 				txs[i] = &abcitypes.ExecTxResult{}
-				log.Debug("Resource Transaction Data:", resourceData)
+				// log.Debug("Resource Transaction Data:", resourceData)
 
 			case types.TransactionType_NodeRegistrationTransaction:
 				registrationData := &types.NodeRegistrationTransactionData{}
 				registrationData = transaction.GetNodeRegistrationData()
+
 				publicKeyString := registrationData.GetNodeAddress()
 				pubKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyString)
 				if err != nil {
@@ -172,7 +136,6 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 
 				if err != nil {
 					log.Error("Error marshalling PublicKey message:", err)
-
 				}
 
 				if err != nil {
@@ -191,7 +154,8 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 					Power:  10,
 				}
 				validatorupdates = append(validatorupdates, *validatorup)
-				log.Debug("Resource Transaction Data after validator:", registrationData)
+				log.Debug("Node succesfully registered: ", len(validatorupdates))
+				// log.Debug("Node Registration Transaction Data:", registrationData)
 
 			default:
 				log.Error("Unknown transaction type")
@@ -201,144 +165,112 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 		}
 	}
 
-	// Invalid transactions get included in blocks just like valid transactions do so checking here is basically pointless!
-
-	//for i := range req.Txs {
-	//	// if code := app.isValid(tx); code != 0 {
-	//	// 	log.Warn("Error: invalid transaction index %v", i)
-	//	// 	txs[i] = &abcitypes.ExecTxResult{Code: code}
-	//	// } else {
-	//	// 	// This is just one type of transaction.
-
-	//	// 	// parts := bytes.SplitN(tx, []byte("="), 2)
-	//	// 	// key, value := parts[0], parts[1]
-	//	// 	// log.Info("Adding key %s with value %s", key, value)
-
-	//	// 	// if err := app.onGoingBlock.Set(key, value); err != nil {
-	//	// 	// 	log.Panicf("Error writing to database, unable to execute tx: %v", err)
-	//	// 	// }
-
-	//	// 	// log.Info("Successfully added key %s with value %s", key, value)
-
-	//	// 	// Accept all transactions that are valid! But don't store them lmao
-
-	//	// 	txs[i] = &abcitypes.ExecTxResult{}
-	//	// 	log.Error("THIS RAN ", testval, testval%2)
-	//	// }
-
-	//	// Need a different mechanism for the transactions that bring verification data.
-	//	// Roughly:
-	//	//	- Make sure the transaction itself is solid.
-	//	//	- Sort by source then by rank.
-	//	//	- Highest ranked transactions are marked for storage, the rest are discarded.
-	//	//	- Store on here?
-	//}
-
 	// Select sources pseudo-randomly.
-	{
-		// Turn hash to 64 bit integer to use as rand seed.
-		var r *rand.Rand
-		{
-			var seed int64
-			hashPrevious := req.GetHash()
-			for i := range hashPrevious {
-				seed ^= int64(hashPrevious[i])
-				seed <<= 8
-			}
-			r = rand.New(rand.NewSource(seed))
-		}
+	// NOTE: Getting rid of this since it cant't actually affect the collector.
+	// {
+	// 	// Turn hash to 64 bit integer to use as rand seed.
+	// 	var r *rand.Rand
+	// 	{
+	// 		var seed int64
+	// 		hashPrevious := req.GetHash()
+	// 		for i := range hashPrevious {
+	// 			seed ^= int64(hashPrevious[i])
+	// 			seed <<= 8
+	// 		}
+	// 		r = rand.New(rand.NewSource(seed))
+	// 	}
 
-		// Not sure what the right number of rounds is :shrug:. Chosing arbitrarily.
-		roundAmount := 10
-		validatorCount := len(req.DecidedLastCommit.Votes)
+	// 	// Not sure what the right number of rounds is :shrug:. Chosing arbitrarily.
+	// 	roundAmount := 10
+	// 	validatorCount := len(req.DecidedLastCommit.Votes)
 
-		if validatorCount > VALIDATOR_PREALLOCATED_COUNT {
-			// XXX: Handle more intelligently.
-			app.validatorFreeThisRound = make([]bool, validatorCount)
-			app.validatorPriorities = make([][]collector.Request, validatorCount)
-		} else {
-			// Go through voters and pick set that voted.
-			app.validatorFreeThisRound = app.validatorFreeThisRound[:validatorCount]
-			app.validatorPriorities = app.validatorPriorities[:validatorCount]
-		}
+	// 	if validatorCount > VALIDATOR_PREALLOCATED_COUNT {
+	// 		// XXX: Handle more intelligently.
+	// 		app.validatorFreeThisRound = make([]bool, validatorCount)
+	// 		app.validatorPriorities = make([][]collector.Request, validatorCount)
+	// 	} else {
+	// 		// Go through voters and pick set that voted.
+	// 		app.validatorFreeThisRound = app.validatorFreeThisRound[:validatorCount]
+	// 		app.validatorPriorities = app.validatorPriorities[:validatorCount]
+	// 	}
 
-		for i := range app.validatorPriorities {
-			app.validatorPriorities[i] = make([]collector.Request, 0, roundAmount)
-		}
-		log.Info("Started source selection.")
+	// 	for i := range app.validatorPriorities {
+	// 		app.validatorPriorities[i] = make([]collector.Request, 0, roundAmount)
+	// 	}
+	// 	log.Info("Started source selection.")
 
-		// NOTE(Tom): This algorithm gives earlier sources higher priority.
-		for round := 0; round < roundAmount && len(app.validatorPriorities) > 0; round++ {
-			// log.Info("Round:", round)
-			for i := range app.validatorFreeThisRound {
-				app.validatorFreeThisRound[i] = true
-			}
+	// 	// NOTE(Tom): This algorithm gives earlier sources higher priority.
+	// 	for round := 0; round < roundAmount && len(app.validatorPriorities) > 0; round++ {
+	// 		// log.Info("Round:", round)
+	// 		for i := range app.validatorFreeThisRound {
+	// 			app.validatorFreeThisRound[i] = true
+	// 		}
 
-			r.Shuffle(len(app.validatorPriorities), func(i, j int) {
-				{
-					temp := app.validatorFreeThisRound[j]
-					app.validatorFreeThisRound[j] = app.validatorFreeThisRound[i]
-					app.validatorFreeThisRound[i] = temp
-				}
+	// 		r.Shuffle(len(app.validatorPriorities), func(i, j int) {
+	// 			{
+	// 				temp := app.validatorFreeThisRound[j]
+	// 				app.validatorFreeThisRound[j] = app.validatorFreeThisRound[i]
+	// 				app.validatorFreeThisRound[i] = temp
+	// 			}
 
-				{
-					temp := app.validatorPriorities[j]
-					app.validatorPriorities[j] = app.validatorPriorities[i]
-					app.validatorPriorities[i] = temp
-				}
-			})
+	// 			{
+	// 				temp := app.validatorPriorities[j]
+	// 				app.validatorPriorities[j] = app.validatorPriorities[i]
+	// 				app.validatorPriorities[i] = temp
+	// 			}
+	// 		})
 
-			for i := range collector.Sources {
-				for j := range collector.Sources[i].Topics {
-					for k := range app.validatorFreeThisRound {
+	// 		for i := range collector.Sources {
+	// 			for j := range collector.Sources[i].Topics {
+	// 				for k := range app.validatorFreeThisRound {
 
-						if app.validatorFreeThisRound[k] {
+	// 					if app.validatorFreeThisRound[k] {
 
-							// Make sure that they're not already assigned to this source.
-							alreadyAssigned := false
-							for _, req := range app.validatorPriorities[k] {
-								if req.Source.Name == collector.Sources[i].Name && req.Topic == j {
-									alreadyAssigned = true
-								}
-							}
+	// 						// Make sure that they're not already assigned to this source.
+	// 						alreadyAssigned := false
+	// 						for _, req := range app.validatorPriorities[k] {
+	// 							if req.Source.Name == collector.Sources[i].Name && req.Topic == j {
+	// 								alreadyAssigned = true
+	// 							}
+	// 						}
 
-							if !alreadyAssigned {
-								app.validatorFreeThisRound[k] = false
+	// 						if !alreadyAssigned {
+	// 							app.validatorFreeThisRound[k] = false
 
-								req := collector.Request{
-									Source: collector.Sources[i],
-									Topic:  j,
-								}
-								app.validatorPriorities[k] = append(app.validatorPriorities[k], req)
+	// 							req := collector.Request{
+	// 								Source: collector.Sources[i],
+	// 								Topic:  j,
+	// 							}
+	// 							app.validatorPriorities[k] = append(app.validatorPriorities[k], req)
 
-								// log.Info("Found validator for source.")
-								break
-							}
-						}
-					}
-				}
-			}
-		}
+	// 							// log.Info("Found validator for source.")
+	// 							break
+	// 						}
+	// 					}
+	// 				}
+	// 			}
+	// 		}
+	// 	}
 
-		// Need to have this info available somewhere...
-		// Decouple this from abci?
+	// 	// Need to have this info available somewhere...
+	// 	// Decouple this from abci?
 
-		log.Info("Done sorting preferences, writting our requests.")
-		for i := range app.validatorPriorities {
-			validator := req.DecidedLastCommit.Votes[i].GetValidator()
+	// 	log.Info("Done sorting preferences, writting our requests.")
+	// 	for i := range app.validatorPriorities {
+	// 		validator := req.DecidedLastCommit.Votes[i].GetValidator()
 
-			temp := sha256.Sum256(app.publicKey)
-			addr := temp[:20]
-			log.Info(validator.Address, addr)
+	// 		temp := sha256.Sum256(app.publicKey)
+	// 		addr := temp[:20]
+	// 		log.Info(validator.Address, addr)
 
-			if bytes.Equal(validator.Address, addr) {
-				log.Info("Found priorities for node.")
+	// 		if bytes.Equal(validator.Address, addr) {
+	// 			log.Info("Found priorities for node.")
 
-				app.assignedRequests = app.validatorPriorities[i]
-				break
-			}
-		}
-	}
+	// 			app.assignedRequests = app.validatorPriorities[i]
+	// 			break
+	// 		}
+	// 	}
+	// }
 
 	return &abcitypes.ResponseFinalizeBlock{
 		TxResults:        txs,
@@ -375,7 +307,7 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 	// check format
 	var transaction types.Transaction
 	err := proto.Unmarshal(tx, &transaction)
-	log.Debug("the tx type is", transaction.Type)
+	// log.Debug("the tx type is", transaction.Type)
 	if err != nil {
 		log.Error("Error unmarshaling transaction data:", err)
 		return 1
@@ -384,19 +316,19 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 	// Check the transaction type and handle accordingly
 	switch transaction.Type {
 	case types.TransactionType_NormalTransaction:
-		normalData := &types.NormalTransactionData{}
-		normalData = transaction.GetNormalData()
-		log.Info("Normal Transaction Data:", normalData)
+		// normalData := &types.NormalTransactionData{}
+		// normalData = transaction.GetNormalData()
+		// log.Info("Normal Transaction Data:", normalData)
 		return 0
 	case types.TransactionType_VerificationTransaction:
-		verificationData := &types.VerificationTransactionData{}
-		verificationData = transaction.GetVerificationData()
-		log.Info("Verification Transaction Data:", verificationData)
+		// verificationData := &types.VerificationTransactionData{}
+		// verificationData = transaction.GetVerificationData()
+		// log.Info("Verification Transaction Data:", verificationData)
 		return 0
 	case types.TransactionType_ResourceTransaction:
-		resourceData := &types.ResourceTransactionData{}
-		resourceData = transaction.GetResourceData()
-		log.Info("Resource Transaction Data:", resourceData)
+		// resourceData := &types.ResourceTransactionData{}
+		// resourceData = transaction.GetResourceData()
+		// log.Info("Resource Transaction Data:", resourceData)
 		return 0
 	case types.TransactionType_NodeRegistrationTransaction:
 		nodeRegistrationData := &types.NodeRegistrationTransactionData{}
@@ -406,7 +338,7 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 			log.Error("Error unmarshaling resource transaction data:", err)
 			return 1
 		}
-		log.Debug("Resource Transaction Data:", nodeRegistrationData)
+		// log.Debug("Resource Transaction Data:", nodeRegistrationData)
 		return 0
 
 	default:
@@ -458,4 +390,36 @@ func (app *VerificationApp) handleVerificationTransaction(tx types.VerificationT
 
 func (app *VerificationApp) handleResourceTransaction(tx types.ResourceTransactionData) uint32 {
 	return 0
+}
+
+func (app VerificationApp) Commit(_ context.Context, commit *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
+	return &abcitypes.ResponseCommit{}, app.onGoingBlock.Commit()
+}
+
+func (app *VerificationApp) ListSnapshots(_ context.Context, snapshots *abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
+	return &abcitypes.ResponseListSnapshots{}, nil
+}
+
+func (app *VerificationApp) OfferSnapshot(_ context.Context, snapshot *abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
+	return &abcitypes.ResponseOfferSnapshot{}, nil
+}
+
+func (app *VerificationApp) LoadSnapshotChunk(_ context.Context, chunk *abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
+	return &abcitypes.ResponseLoadSnapshotChunk{}, nil
+}
+
+func (app *VerificationApp) ApplySnapshotChunk(_ context.Context, chunk *abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
+	return &abcitypes.ResponseApplySnapshotChunk{Result: abcitypes.ResponseApplySnapshotChunk_ACCEPT}, nil
+}
+
+func (app VerificationApp) ExtendVote(_ context.Context, extend *abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
+	return &abcitypes.ResponseExtendVote{}, nil
+}
+
+func (app *VerificationApp) VerifyVoteExtension(_ context.Context, verify *abcitypes.RequestVerifyVoteExtension) (*abcitypes.ResponseVerifyVoteExtension, error) {
+	return &abcitypes.ResponseVerifyVoteExtension{}, nil
+}
+
+func (app *VerificationApp) Info(_ context.Context, info *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
+	return &abcitypes.ResponseInfo{}, nil
 }

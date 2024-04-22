@@ -1,0 +1,29 @@
+pprof:
+  enabled: true
+  addr: 127.0.0.1:9082
+p2p:
+  # 0.0.0.0 = localhost
+  addr: 0.0.0.0
+  # 0 = random port
+  port: 0
+  groupName: xnode
+  peerLimit: 50
+bft:
+  homeDir: /tmp/cometbft-home
+log:
+  development: false
+  encoding: json
+  info:
+    toStdout: true
+    toFile: true
+    fileName: logs/core-info.log
+    maxSize: 10
+    maxAge: 7
+    maxBackups: 10
+  error:
+    toStderr: true
+    toFile: true
+    fileName: logs/core-error.log
+    maxSize: 10
+    maxAge: 7
+    maxBackups: 10

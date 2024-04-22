@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/openmesh-network/core/collector"
 	"github.com/openmesh-network/core/internal/bft"
@@ -13,14 +17,11 @@ import (
 	"github.com/openmesh-network/core/internal/core"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
-	"github.com/openmesh-network/core/networking/p2p"
 	"github.com/openmesh-network/core/updater"
-	"net/http"
-	_ "net/http/pprof"
 )
 
 const (
-	allowLoadConfigAtRuntime = true
+	useRuntimeConfigFile = true
 )
 
 var (
@@ -38,12 +39,15 @@ var (
 )
 
 func main() {
+
+	fmt.Println(configCompileValue)
+
 	go http.ListenAndServe("localhost:8080", nil)
 
-	if allowLoadConfigAtRuntime {
+	if useRuntimeConfigFile {
 		config.ParseFlags()
 	}
-	config.ParseConfig(configCompileValue, allowLoadConfigAtRuntime)
+	config.ParseConfig(configCompileValue, useRuntimeConfigFile)
 
 	// Initialise logger after parsing configuration
 	logger.InitLogger()
@@ -54,10 +58,10 @@ func main() {
 	defer cancel()
 
 	// Initialise p2p instance.
-	p2pInstance, err := p2p.NewInstance(cancelCtx, config.Config.P2P).Build()
-	if err != nil {
-		logger.Fatalf("Failed to initialise p2p instance: %s", err.Error())
-	}
+	// p2pInstance, err := p2p.NewInstance(cancelCtx, config.Config.P2P).Build()
+	// if err != nil {
+	// 	logger.Fatalf("Failed to initialise p2p instance: %s", err.Error())
+	// }
 
 	// Initialise BadgerDB connection
 	dbInstance, err := database.NewInstance()
@@ -66,8 +70,10 @@ func main() {
 	}
 
 	// Need collector before bft.
-	collectorInstance := collector.New()
-	collectorInstance.Start(cancelCtx)
+	var collectorInstance *collector.CollectorInstance
+	collectorInstance = nil
+	// collectorInstance = collector.New()
+	// collectorInstance.Start(cancelCtx)
 
 	// Initialise CometBFT instance
 	bftInstance, err := bft.NewInstance(dbInstance.Conn, collectorInstance)
@@ -77,11 +83,11 @@ func main() {
 
 	// Run the updater.
 	// TODO: Maybe pass past CID versions to avoid redownloading old updates.
-	updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
+	// updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
 
 	// Build and start top-level instance.
 	ins := core.NewInstance().
-		SetP2pInstance(p2pInstance).
+		//SetP2pInstance(p2pInstance).
 		SetDBInstance(dbInstance).
 		SetBFTInstance(bftInstance)
 	ins.Start(cancelCtx)

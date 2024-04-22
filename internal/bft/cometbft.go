@@ -1,16 +1,18 @@
 package bft
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	cfg "github.com/cometbft/cometbft/config"
 	cmtflags "github.com/cometbft/cometbft/libs/cli/flags"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
+	"github.com/cometbft/cometbft/libs/rand"
 	nm "github.com/cometbft/cometbft/node"
 	bftp2p "github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/privval"
@@ -28,13 +30,17 @@ import (
 	"github.com/spf13/viper"
 )
 
+var Max_Validator int = 99999
+
 // Instance is the CometBFT instance
 type Instance struct {
-	Config    *cfg.Config
-	BftNode   *nm.Node
-	Collector *collector.CollectorInstance
-	app       *abci.VerificationApp
-	collector *collector.CollectorInstance
+	Config     *cfg.Config
+	Addr       []byte
+	BftNode    *nm.Node
+	Collector  *collector.CollectorInstance
+	app        *abci.VerificationApp
+	collector  *collector.CollectorInstance
+	FullPubKey []byte
 }
 
 // NewInstance initialise a CometBFT instance use the config specified
@@ -100,17 +106,23 @@ func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instan
 		return nil, err
 	}
 
-	return &Instance{Config: conf, BftNode: node, app: app, collector: collector}, nil
+	temp := sha256.Sum256(publicKey.Bytes())
+	InstancePub := publicKey.Bytes()
+	return &Instance{Config: conf, BftNode: node, app: app, collector: collector, Addr: temp[:20], FullPubKey: InstancePub}, nil
 }
 
 // Start the CometBFT node
 func (inst *Instance) Start(ctx context.Context) {
 	eventBus := inst.BftNode.EventBus()
 
+	base64AddrString := base64.StdEncoding.EncodeToString(inst.FullPubKey)
+
 	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryNewBlock)
 	if err != nil {
 		panic(err)
 	}
+
+	registered := false
 
 	// Event handler
 	go func() {
@@ -123,38 +135,84 @@ func (inst *Instance) Start(ctx context.Context) {
 				eventBus.UnsubscribeAll(ctx, "mainId")
 				return
 			case <-newBlock.Out():
-				requests := inst.app.GetRequestsDue()
-
-				var summaries []collector.Summary
-				if requests != nil {
-					summaries = inst.collector.SubmitRequests(requests)
-				} else {
-					log.Debug("No requests this block :(")
+				env, err := inst.BftNode.ConfigureRPC()
+				if err != nil {
+					panic(err)
 				}
 
-				for i := range summaries {
-					log.Debug("Went through: ", i, " summaries. ", summaries[i])
-					s := summaries[i]
-					r := requests[i]
+				// If not connected, then connect!
+				if !registered {
+					res, err := env.Status(&rpctypes.Context{})
+					if err != nil {
+						panic(err)
+					}
 
-					if len(s.DataHashes) < 1 {
-						log.Debug("No hash for this source :(")
-					} else {
+					// Now you can access the fields of the ResultStatus struct
+					var cur_page int = 1
+					var already_registered bool = false
+					res2, err := env.Validators(&rpctypes.Context{}, &res.SyncInfo.LatestBlockHeight, &cur_page, &Max_Validator)
+					if err != nil {
+						panic(err)
+					}
+					for i := 0; i < len(res2.Validators); i++ {
+						keybytes := res2.Validators[i].PubKey.Bytes()
+						if bytes.Equal(keybytes, inst.FullPubKey) {
+							already_registered = true
+							registered = true
+						}
+					}
+					if !already_registered {
+						transactionMessage := otypes.Transaction{
+							Owner:     base64AddrString,
+							Signature: "",
+							Type:      *otypes.TransactionType_NodeRegistrationTransaction.Enum(),
+							Data: &otypes.Transaction_NodeRegistrationData{
+								NodeRegistrationData: &otypes.NodeRegistrationTransactionData{
+									NodeAddress:     base64AddrString,
+									NodeAttestation: "",
+									NodeSignature:   "",
+								},
+							},
+						}
+
+						transactionBytes, err := proto.Marshal(&transactionMessage)
+						if err != nil {
+							panic(err)
+						}
+
+						transaction := types.Tx(transactionBytes[:])
+
+						log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
+						_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
+
+						if err != nil {
+							log.Error("Failed to push registration transaction: ", err)
+							// panic(err)
+						} else {
+							log.Debug("Succesfully pushed registration transaction!")
+							registered = true
+						}
+					}
+				} else {
+					transactionPushedCount := 0
+					for i := 0; i < collector.WORKER_COUNT; i++ {
 						// Format as a transactionMessage
 						transactionMessage := otypes.Transaction{
-							Owner:     "John Doe",
-							Signature: strconv.Itoa(i),
+							Owner:     base64AddrString,
+							Signature: "",
 							Type:      *otypes.TransactionType_VerificationTransaction.Enum(),
 						}
 
+						// Build some dataset.
 						transactionMessage.Data = &otypes.Transaction_VerificationData{
 							VerificationData: &otypes.VerificationTransactionData{
 								// XXX: Actually provide attestation here.
 								Attestation: "",
 								// XXX: Need to decide how we're building the cids.
 								// There's a tradeoff between blockchain size and download speed.
-								Cid:        s.DataHashes[0].String(),
-								Datasource: r.Source.Name + "-" + r.Source.Topics[r.Topic],
+								// Make a fake but plausible CID
+								Cid:        base64.StdEncoding.EncodeToString(rand.Bytes(40)),
+								Datasource: "examplesource" + "-" + "exampletopic",
 								// XXX: Should this be the time it started being recorded or ended?
 								Timestamp: time.Now().Unix(),
 							},
@@ -170,19 +228,20 @@ func (inst *Instance) Start(ctx context.Context) {
 						env, err := inst.BftNode.ConfigureRPC()
 
 						if err != nil {
+							fmt.Println(transaction)
 							panic(err)
 						}
 
-						log.Debug("Pushing transaction with hash: ", sha256.Sum256(transactionBytes))
 						_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
 
 						if err != nil {
-							panic(err)
+							log.Error("Couldn't push transaction, reason: ", err)
+							// panic(err)
+						} else {
+							transactionPushedCount++
 						}
-						log.Debug("Succesfully pushed transaction!")
-
-						log.Debug("Got summary: ", s)
 					}
+					log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
 				}
 			}
 		}
