@@ -214,10 +214,14 @@ func main() {
 		genesisFile = string(genesisFileBytes)
 
 		setupYamlConfig(bootstrapDir)
-
 	}
+
 	fmt.Println("Wrote bootstrap node config")
 
+	if len(genesisFileArg) > 0 {
+		// If we have an external genesis.json, give the bootstrap node the same config as all the other nodes.
+		os.WriteFile(bootstrapDir+"/cbft/config/genesis.json", []byte(genesisFile), 0o777)
+	}
 	// Copy the genesis file to the seed node.
 	os.WriteFile(seedDir+"/cbft/config/genesis.json", []byte(genesisFile), 0o777)
 	ipCurrent := seedNodeIp
@@ -277,8 +281,8 @@ func main() {
 	{
 		// Run first node.
 		cmds[0] = exec.Command("./core", "-config", bootstrapDir+"/config.yaml")
-		cmds[0].Stdout = os.Stdout
-		cmds[0].Stderr = os.Stderr
+		// cmds[0].Stdout = os.Stdout
+		// cmds[0].Stderr = os.Stderr
 
 		// Run seed node.
 		cmds[1] = exec.Command("./core", "-config", seedDir+"/config.yaml")
@@ -290,8 +294,9 @@ func main() {
 			nodeDir := DIR_BASE + "/node-" + strconv.Itoa(i)
 			cmds[i+2] = exec.Command("./core", "-config", nodeDir+"/config.yaml")
 		}
-		// cmds[30].Stdout = os.Stdout
-		// cmds[30].Stderr = os.Stderr
+
+		cmds[30].Stdout = os.Stdout
+		cmds[30].Stderr = os.Stderr
 	}
 
 	for i := range cmds {
