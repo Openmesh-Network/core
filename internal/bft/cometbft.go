@@ -117,7 +117,12 @@ func (inst *Instance) Start(ctx context.Context) {
 
 	base64AddrString := base64.StdEncoding.EncodeToString(inst.FullPubKey)
 
-	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryVote)
+	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryValidBlock)
+	if err != nil {
+		panic(err)
+	}
+
+	newVote, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryVote)
 	if err != nil {
 		panic(err)
 	}
@@ -132,6 +137,9 @@ func (inst *Instance) Start(ctx context.Context) {
 				eventBus.UnsubscribeAll(ctx, "mainId")
 				return
 			case <-newBlock.Canceled():
+				eventBus.UnsubscribeAll(ctx, "mainId")
+				return
+			case <-newVote.Canceled():
 				eventBus.UnsubscribeAll(ctx, "mainId")
 				return
 			case <-newBlock.Out():
@@ -193,56 +201,56 @@ func (inst *Instance) Start(ctx context.Context) {
 							registered = true
 						}
 					}
-				} else {
-					transactionPushedCount := 0
-					for i := 0; i < collector.WORKER_COUNT; i++ {
-						// Format as a transactionMessage
-						transactionMessage := otypes.Transaction{
-							Owner:     base64AddrString,
-							Signature: "",
-							Type:      *otypes.TransactionType_VerificationTransaction.Enum(),
-						}
-
-						// Build some dataset.
-						transactionMessage.Data = &otypes.Transaction_VerificationData{
-							VerificationData: &otypes.VerificationTransactionData{
-								// XXX: Actually provide attestation here.
-								Attestation: "",
-								// XXX: Need to decide how we're building the cids.
-								// There's a tradeoff between blockchain size and download speed.
-								// Make a fake but plausible CID
-								Cid:        base64.StdEncoding.EncodeToString(rand.Bytes(40)),
-								Datasource: "examplesource" + "-" + "exampletopic",
-								// XXX: Should this be the time it started being recorded or ended?
-								Timestamp: time.Now().Unix(),
-							},
-						}
-
-						transactionBytes, err := proto.Marshal(&transactionMessage)
-						if err != nil {
-							panic(err)
-						}
-
-						transaction := types.Tx(transactionBytes[:])
-
-						env, err := inst.BftNode.ConfigureRPC()
-
-						if err != nil {
-							fmt.Println(transaction)
-							panic(err)
-						}
-
-						_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
-
-						if err != nil {
-							log.Error("Couldn't push transaction, reason: ", err)
-							// panic(err)
-						} else {
-							transactionPushedCount++
-						}
-					}
-					log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
 				}
+			case <-newVote.Out():
+				transactionPushedCount := 0
+				for i := 0; i < collector.WORKER_COUNT; i++ {
+					// Format as a transactionMessage
+					transactionMessage := otypes.Transaction{
+						Owner:     base64AddrString,
+						Signature: "",
+						Type:      *otypes.TransactionType_VerificationTransaction.Enum(),
+					}
+
+					// Build some dataset.
+					transactionMessage.Data = &otypes.Transaction_VerificationData{
+						VerificationData: &otypes.VerificationTransactionData{
+							// XXX: Actually provide attestation here.
+							Attestation: "",
+							// XXX: Need to decide how we're building the cids.
+							// There's a tradeoff between blockchain size and download speed.
+							// Make a fake but plausible CID
+							Cid:        base64.StdEncoding.EncodeToString(rand.Bytes(40)),
+							Datasource: "examplesource" + "-" + "exampletopic",
+							// XXX: Should this be the time it started being recorded or ended?
+							Timestamp: time.Now().Unix(),
+						},
+					}
+
+					transactionBytes, err := proto.Marshal(&transactionMessage)
+					if err != nil {
+						panic(err)
+					}
+
+					transaction := types.Tx(transactionBytes[:])
+
+					env, err := inst.BftNode.ConfigureRPC()
+
+					if err != nil {
+						fmt.Println(transaction)
+						panic(err)
+					}
+
+					_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
+
+					if err != nil {
+						log.Error("Couldn't push transaction, reason: ", err)
+						// panic(err)
+					} else {
+						transactionPushedCount++
+					}
+				}
+				log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
 			}
 		}
 	}()
