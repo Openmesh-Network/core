@@ -244,6 +244,7 @@ func (inst *Instance) Start(ctx context.Context) {
 							transactionPushedCount++
 						}
 					}
+
 					log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
 				}
 			}
