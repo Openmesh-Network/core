@@ -158,47 +158,54 @@ func (inst *Instance) Start(ctx context.Context) {
 					// Now you can access the fields of the ResultStatus struct
 					var cur_page int = 1
 					var already_registered bool = false
-					res2, err := env.Validators(&rpctypes.Context{}, &res.SyncInfo.LatestBlockHeight, &cur_page, &Max_Validator)
-					if err != nil {
-						panic(err)
-					}
-					for i := 0; i < len(res2.Validators); i++ {
-						keybytes := res2.Validators[i].PubKey.Bytes()
-						if bytes.Equal(keybytes, inst.FullPubKey) {
-							already_registered = true
-							registered = true
-						}
-					}
-					if !already_registered {
-						transactionMessage := otypes.Transaction{
-							Owner:     base64AddrString,
-							Signature: "",
-							Type:      *otypes.TransactionType_NodeRegistrationTransaction.Enum(),
-							Data: &otypes.Transaction_NodeRegistrationData{
-								NodeRegistrationData: &otypes.NodeRegistrationTransactionData{
-									NodeAddress:     base64AddrString,
-									NodeAttestation: "",
-									NodeSignature:   "",
-								},
-							},
-						}
+					log.Warn("Latest block height: ", res.SyncInfo.LatestBlockHeight)
 
-						transactionBytes, err := proto.Marshal(&transactionMessage)
+					if res.SyncInfo.LatestBlockHeight > 0 {
+						res2, err := env.Validators(&rpctypes.Context{}, &res.SyncInfo.LatestBlockHeight, &cur_page, &Max_Validator)
+
 						if err != nil {
 							panic(err)
 						}
 
-						transaction := types.Tx(transactionBytes[:])
+						for i := 0; i < len(res2.Validators); i++ {
+							keybytes := res2.Validators[i].PubKey.Bytes()
+							if bytes.Equal(keybytes, inst.FullPubKey) {
+								already_registered = true
+								registered = true
+							}
+						}
 
-						log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
-						_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
+						if !already_registered {
+							transactionMessage := otypes.Transaction{
+								Owner:     base64AddrString,
+								Signature: "",
+								Type:      *otypes.TransactionType_NodeRegistrationTransaction.Enum(),
+								Data: &otypes.Transaction_NodeRegistrationData{
+									NodeRegistrationData: &otypes.NodeRegistrationTransactionData{
+										NodeAddress:     base64AddrString,
+										NodeAttestation: "",
+										NodeSignature:   "",
+									},
+								},
+							}
 
-						if err != nil {
-							log.Error("Failed to push registration transaction: ", err)
-							// panic(err)
-						} else {
-							log.Debug("Succesfully pushed registration transaction!")
-							registered = true
+							transactionBytes, err := proto.Marshal(&transactionMessage)
+							if err != nil {
+								panic(err)
+							}
+
+							transaction := types.Tx(transactionBytes[:])
+
+							log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
+							_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
+
+							if err != nil {
+								log.Error("Failed to push registration transaction: ", err)
+								// panic(err)
+							} else {
+								log.Debug("Succesfully pushed registration transaction!")
+								registered = true
+							}
 						}
 					}
 				}
