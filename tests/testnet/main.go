@@ -1,9 +1,5 @@
 package main
 
-// Notes(Tom):
-//	- Using cometbft cli since it is easier than importing the libraries for now.
-//	-
-
 import (
 	"bytes"
 	"fmt"
@@ -20,7 +16,7 @@ const DEFAULT_NODE_COUNT = 300
 const DIR_BASE = "/data"
 const INCREMENT_IPS = false
 
-// Won't necessarily be compatible with OS.
+// Won't necessarily be compatible with OS ipv4.
 // Made to work internally only.
 func ipToString(ip uint32) string {
 	ret := ""
@@ -34,7 +30,7 @@ func ipToString(ip uint32) string {
 	return ret
 }
 
-// Won't necessarily be compatible with OS.
+// Won't necessarily be compatible with OS ipv4.
 // Made to work internally only.
 func ipToInt(ip string) uint32 {
 	chunks := strings.Split(ip, ".")

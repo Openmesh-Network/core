@@ -117,7 +117,7 @@ func (inst *Instance) Start(ctx context.Context) {
 
 	base64AddrString := base64.StdEncoding.EncodeToString(inst.FullPubKey)
 
-	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryNewBlock)
+	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryCompleteProposal)
 	if err != nil {
 		panic(err)
 	}
