@@ -1,7 +1,6 @@
 package bft
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -29,8 +28,6 @@ import (
 	log "github.com/openmesh-network/core/internal/logger"
 	"github.com/spf13/viper"
 )
-
-var Max_Validator int = 99999
 
 // Instance is the CometBFT instance
 type Instance struct {
@@ -123,6 +120,7 @@ func (inst *Instance) Start(ctx context.Context) {
 	}
 
 	registered := false
+	registerSentTransaction := false
 
 	// Event handler
 	go func() {
@@ -148,26 +146,24 @@ func (inst *Instance) Start(ctx context.Context) {
 					}
 
 					// Now you can access the fields of the ResultStatus struct
-					var cur_page int = 1
-					var already_registered bool = false
 					log.Warn("Latest block height: ", res.SyncInfo.LatestBlockHeight)
 
 					if res.SyncInfo.LatestBlockHeight > 0 {
-						res2, err := env.Validators(&rpctypes.Context{}, &res.SyncInfo.LatestBlockHeight, &cur_page, &Max_Validator)
 
+						validatorSet, err := env.StateStore.LoadValidators(res.SyncInfo.LatestBlockHeight)
 						if err != nil {
 							panic(err)
 						}
 
-						for i := 0; i < len(res2.Validators); i++ {
-							keybytes := res2.Validators[i].PubKey.Bytes()
-							if bytes.Equal(keybytes, inst.FullPubKey) {
-								already_registered = true
-								registered = true
-							}
+						temp := sha256.Sum256(inst.FullPubKey)
+						addr := temp[:20]
+
+						if validatorSet.HasAddress(addr) {
+							log.Info("Turns out we're registered!")
+							registered = true
 						}
 
-						if !already_registered {
+						if !registerSentTransaction {
 							transactionMessage := otypes.Transaction{
 								Owner:     base64AddrString,
 								Signature: "",
@@ -196,6 +192,7 @@ func (inst *Instance) Start(ctx context.Context) {
 								// panic(err)
 							} else {
 								log.Debug("Succesfully pushed registration transaction!")
+								registerSentTransaction = true
 							}
 						}
 					}
