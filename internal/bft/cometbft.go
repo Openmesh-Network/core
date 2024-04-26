@@ -1,7 +1,6 @@
 package bft
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -29,8 +28,6 @@ import (
 	log "github.com/openmesh-network/core/internal/logger"
 	"github.com/spf13/viper"
 )
-
-var Max_Validator int = 99999
 
 // Instance is the CometBFT instance
 type Instance struct {
@@ -117,12 +114,13 @@ func (inst *Instance) Start(ctx context.Context) {
 
 	base64AddrString := base64.StdEncoding.EncodeToString(inst.FullPubKey)
 
-	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryNewBlock)
+	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryValidBlock)
 	if err != nil {
 		panic(err)
 	}
 
 	registered := false
+	registerSentTransaction := false
 
 	// Event handler
 	go func() {
@@ -148,49 +146,54 @@ func (inst *Instance) Start(ctx context.Context) {
 					}
 
 					// Now you can access the fields of the ResultStatus struct
-					var cur_page int = 1
-					var already_registered bool = false
-					res2, err := env.Validators(&rpctypes.Context{}, &res.SyncInfo.LatestBlockHeight, &cur_page, &Max_Validator)
-					if err != nil {
-						panic(err)
-					}
-					for i := 0; i < len(res2.Validators); i++ {
-						keybytes := res2.Validators[i].PubKey.Bytes()
-						if bytes.Equal(keybytes, inst.FullPubKey) {
-							already_registered = true
-							registered = true
-						}
-					}
-					if !already_registered {
-						transactionMessage := otypes.Transaction{
-							Owner:     base64AddrString,
-							Signature: "",
-							Type:      *otypes.TransactionType_NodeRegistrationTransaction.Enum(),
-							Data: &otypes.Transaction_NodeRegistrationData{
-								NodeRegistrationData: &otypes.NodeRegistrationTransactionData{
-									NodeAddress:     base64AddrString,
-									NodeAttestation: "",
-									NodeSignature:   "",
-								},
-							},
-						}
+					log.Warn("Latest block height: ", res.SyncInfo.LatestBlockHeight)
 
-						transactionBytes, err := proto.Marshal(&transactionMessage)
+					if res.SyncInfo.LatestBlockHeight > 0 {
+
+						validatorSet, err := env.StateStore.LoadValidators(res.SyncInfo.LatestBlockHeight)
 						if err != nil {
 							panic(err)
 						}
 
-						transaction := types.Tx(transactionBytes[:])
+						temp := sha256.Sum256(inst.FullPubKey)
+						addr := temp[:20]
 
-						log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
-						_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
-
-						if err != nil {
-							log.Error("Failed to push registration transaction: ", err)
-							// panic(err)
-						} else {
-							log.Debug("Succesfully pushed registration transaction!")
+						if validatorSet.HasAddress(addr) {
+							log.Info("Turns out we're registered!")
 							registered = true
+						}
+
+						if !registerSentTransaction {
+							transactionMessage := otypes.Transaction{
+								Owner:     base64AddrString,
+								Signature: "",
+								Type:      *otypes.TransactionType_NodeRegistrationTransaction.Enum(),
+								Data: &otypes.Transaction_NodeRegistrationData{
+									NodeRegistrationData: &otypes.NodeRegistrationTransactionData{
+										NodeAddress:     base64AddrString,
+										NodeAttestation: "",
+										NodeSignature:   "",
+									},
+								},
+							}
+
+							transactionBytes, err := proto.Marshal(&transactionMessage)
+							if err != nil {
+								panic(err)
+							}
+
+							transaction := types.Tx(transactionBytes[:])
+
+							log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
+							_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
+
+							if err != nil {
+								log.Error("Failed to push registration transaction: ", err)
+								// panic(err)
+							} else {
+								log.Debug("Succesfully pushed registration transaction!")
+								registerSentTransaction = true
+							}
 						}
 					}
 				} else {
@@ -241,6 +244,7 @@ func (inst *Instance) Start(ctx context.Context) {
 							transactionPushedCount++
 						}
 					}
+
 					log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
 				}
 			}
