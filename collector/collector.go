@@ -2,6 +2,10 @@ package collector
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multicodec"
@@ -239,6 +243,112 @@ func (cw *CollectorWorker) run(ctx context.Context, buffer []byte) {
 			}
 		}
 	}
+}
+
+type DataCheckResult struct {
+	SourceName string
+	Topic      string
+	Messages   int
+	DataSize   int64
+	Valid      bool
+}
+
+func (ci *CollectorInstance) CheckSourcesSanity() error {
+	var wg sync.WaitGroup
+	results := make(chan DataCheckResult, 100)
+	errors := make(chan error, 100)
+
+	checkTopic := func(source Source, topic string) {
+		defer wg.Done()
+
+		if !strings.Contains(source.Name, "rpc") {
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			msgChannel, errChannel, err := source.JoinFunc(ctx, source, topic)
+			if err != nil {
+				errors <- fmt.Errorf(" con failed %s with topic %s: %v", source.Name, topic, err)
+				return
+			}
+
+			var count int
+			var dataSize int64
+			var validDataCount int
+
+			// data collection ttime
+			timer := time.NewTimer(20 * time.Second)
+
+			for {
+				select {
+				case msg := <-msgChannel:
+					dataSize += int64(len(msg))
+					count++
+
+					var data interface{}
+					if jsoniterator.Unmarshal(msg, &data) == nil {
+						validDataCount++
+					}
+				case err := <-errChannel:
+					errors <- fmt.Errorf("error from source %s with topic %s: %v", source.Name, topic, err)
+					return
+				case <-timer.C:
+					results <- DataCheckResult{
+						SourceName: source.Name,
+						Topic:      topic,
+						Messages:   count,
+						DataSize:   dataSize,
+						Valid:      validDataCount > 0,
+					}
+					return
+				case <-ctx.Done():
+					if ctx.Err() == context.DeadlineExceeded {
+						errors <- fmt.Errorf("timeout occurred for source %s with topic %s", source.Name, topic)
+					}
+					return
+				}
+			}
+		}
+	}
+
+	for _, source := range Sources {
+		for _, topic := range source.Topics {
+			wg.Add(1)
+			go checkTopic(source, topic)
+		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+		close(errors)
+	}()
+
+	for {
+		select {
+		case result, ok := <-results:
+			if !ok {
+				results = nil
+			} else {
+				log.Infof("Checked %s:%s - Messages: %d, DataSize: %d, Valid: %t\n", result.SourceName, result.Topic, result.Messages, result.DataSize, result.Valid)
+			}
+		case err, ok := <-errors:
+			if !ok {
+				errors = nil
+			} else {
+				log.Infoln("Error:", err)
+				// return err
+			}
+		}
+
+		if results == nil && errors == nil {
+			fmt.Println("Empty results")
+			break
+		}
+	}
+
+	log.Infoln("All sources have been successfully checked.")
+	return nil
 }
 
 func (ci *CollectorInstance) Start(ctx context.Context) {

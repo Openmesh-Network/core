@@ -1,0 +1,63 @@
+Sources:
+  - Name: "binance"
+    JoinFunc: "defaultJoinCEX"
+    ApiURL: "wss://stream.binance.us:9443/ws"
+    Topics:
+      - "ethusdt"
+      - "solusdt"
+      - "btcusdt"
+    Request: "{ \"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1 }"
+    Marshaler: "JsonToBsonMarshaler"
+
+  - Name: "coinbase"
+    JoinFunc: "defaultJoinCEX"
+    ApiURL: "wss://ws-feed.pro.coinbase.com"
+    Topics:
+      - "ETH-USD"
+    Request: "{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"
+    Marshaler: "JsonToBsonMarshaler"
+
+  - Name: "dydx"
+    JoinFunc: "defaultJoinCEX"
+    ApiURL: "wss://api.dydx.exchange/v3/ws"
+    Topics:
+      - "MATIC-USD"
+    Request: "{\"type\": \"subscribe\", \"id\": \"{{topic}}\", \"channel\": \"v3_trades\"}"
+    Marshaler: "JsonToBsonMarshaler"
+
+  - Name: "bybit"
+    JoinFunc: "defaultJoinCEX"
+    ApiURL: "wss://stream.bybit.com/v5/public/spot"
+    Topics:
+      - "orderbook.50.BTCUSDT"
+      - "publicTrade.BTCUSDT"
+      - "tickers.BTCUSDT"
+      - "kline.M.BTCUSDT"
+    Request: "{\"op\": \"subscribe\",\"args\": [\"{{topic}}\"]}"
+    Marshaler: "JsonToBsonMarshaler"
+
+  - Name: "okx"
+    JoinFunc: "defaultJoinCEX"
+    ApiURL: "wss://ws.okx.com:8443/ws/v5/business"
+    Topics:
+      - "sprd-bbo-tbt"
+      - "sprd-books5"
+      - "sprd-public-trades"
+      - "sprd-tickers"
+    Request: "{\"op\": \"subscribe\",\"args\": [{\"channel\": \"{{topic}}\",\"sprdId\": \"BTC-USDT_BTC-USDT-SWAP\"}]}"
+    Marshaler: "JsonToBsonMarshaler"
+
+  - Name: "ethereum-ankr-rpc"
+    JoinFunc: "ankrJoinRPC"
+    ApiURL: "https://rpc.ankr.com/eth"
+    Topics: [""]
+    Request: ""
+    Marshaler: "JsonToLz4Marshaler"
+
+  - Name: "polygon-ankr-rpc"
+    JoinFunc: "ankrJoinRPC"
+    ApiURL: "https://rpc.ankr.com/polygon"
+    Topics: [""]
+    Request: ""
+    Marshaler: "JsonToLz4Marshaler"
+

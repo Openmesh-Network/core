@@ -3,9 +3,14 @@ package main
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/openmesh-network/core/collector"
 	"github.com/openmesh-network/core/internal/bft"
@@ -15,8 +20,6 @@ import (
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/networking/p2p"
 	"github.com/openmesh-network/core/updater"
-	"net/http"
-	_ "net/http/pprof"
 )
 
 const (
@@ -67,6 +70,18 @@ func main() {
 
 	// Need collector before bft.
 	collectorInstance := collector.New()
+
+	// checking Sanity here
+	logger.Infoln("Checking Sanity... Please wait ~ 20 seconds")
+	errSanity := collectorInstance.CheckSourcesSanity()
+	if errSanity != nil {
+		fmt.Println("ABorting collection and stopping program. Sanity check failed")
+		panic(errSanity)
+	}
+
+	// debug
+	time.Sleep(5 * time.Second)
+
 	collectorInstance.Start(cancelCtx)
 
 	// Initialise CometBFT instance

@@ -305,3 +305,56 @@ func getVarFromEnv(envKey string) string {
 	fmt.Println("Found OpenSea API Key in environment")
 	return envVar
 }
+
+/*
+// Will need to migrate to this approach for better managability
+// For now during development its okay to hardcode in the code.
+
+type Source struct {
+	Name      string   `yaml:"Name"`
+	JoinFunc  string   `yaml:"JoinFunc"` // We will store the function name as a string --> convert later
+	ApiURL    string   `yaml:"ApiURL"`
+	Topics    []string `yaml:"Topics"`
+	Request   string   `yaml:"Request"`
+	Marshaler string   `yaml:"Marshaler"` // Store the marshaler type as a string --> covert later
+}
+
+type Config struct {
+	Sources []Source `yaml:"Sources"`
+}
+
+func LoadConfig(filename string) (*Config, error) {
+	buf, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	c := &Config{}
+	err = yaml.Unmarshal(buf, c)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+var joinFuncs = map[string]func(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error){
+	"defaultJoinCEX": defaultJoinCEX,
+	"ankrJoinRPC":    ankrJoinRPC,
+}
+
+var marshalers = map[string]MarshalFunc{
+	"JsonToBsonMarshaler": &JsonToBsonMarshaler{},
+	"JsonToLz4Marshaler":  &JsonToLz4Marshaler{},
+}
+
+func setupSources(config *Config) {
+	for i, src := range config.Sources {
+		if join, ok := joinFuncs[src.JoinFunc]; ok {
+			config.Sources[i].JoinFunc = join
+		}
+		if marshal, ok := marshalers[src.Marshaler]; ok {
+			config.Sources[i].Marshaler = marshal
+		}
+	}
+}
+
+*/
