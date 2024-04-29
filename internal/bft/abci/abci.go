@@ -1,8 +1,11 @@
 package verificationApp
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"math/rand"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/dgraph-io/badger/v3"
@@ -12,6 +15,7 @@ import (
 	crypt "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	"github.com/openmesh-network/core/collector"
 	"github.com/openmesh-network/core/internal/bft/types"
+	"github.com/openmesh-network/core/internal/config"
 	log "github.com/openmesh-network/core/internal/logger"
 )
 
@@ -166,111 +170,110 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 	}
 
 	// Select sources pseudo-randomly.
-	// NOTE: Getting rid of this since it cant't actually affect the collector.
-	// {
-	// 	// Turn hash to 64 bit integer to use as rand seed.
-	// 	var r *rand.Rand
-	// 	{
-	// 		var seed int64
-	// 		hashPrevious := req.GetHash()
-	// 		for i := range hashPrevious {
-	// 			seed ^= int64(hashPrevious[i])
-	// 			seed <<= 8
-	// 		}
-	// 		r = rand.New(rand.NewSource(seed))
-	// 	}
+	if !config.Config.BFT.SkipSourceSelection {
+		// Turn hash to 64 bit integer to use as rand seed.
+		var r *rand.Rand
+		{
+			var seed int64
+			hashPrevious := req.GetHash()
+			for i := range hashPrevious {
+				seed ^= int64(hashPrevious[i])
+				seed <<= 8
+			}
+			r = rand.New(rand.NewSource(seed))
+		}
 
-	// 	// Not sure what the right number of rounds is :shrug:. Chosing arbitrarily.
-	// 	roundAmount := 10
-	// 	validatorCount := len(req.DecidedLastCommit.Votes)
+		// Not sure what the right number of rounds is :shrug:. Chosing arbitrarily.
+		roundAmount := 10
+		validatorCount := len(req.DecidedLastCommit.Votes)
 
-	// 	if validatorCount > VALIDATOR_PREALLOCATED_COUNT {
-	// 		// XXX: Handle more intelligently.
-	// 		app.validatorFreeThisRound = make([]bool, validatorCount)
-	// 		app.validatorPriorities = make([][]collector.Request, validatorCount)
-	// 	} else {
-	// 		// Go through voters and pick set that voted.
-	// 		app.validatorFreeThisRound = app.validatorFreeThisRound[:validatorCount]
-	// 		app.validatorPriorities = app.validatorPriorities[:validatorCount]
-	// 	}
+		if validatorCount > VALIDATOR_PREALLOCATED_COUNT {
+			// XXX: Handle more intelligently.
+			app.validatorFreeThisRound = make([]bool, validatorCount)
+			app.validatorPriorities = make([][]collector.Request, validatorCount)
+		} else {
+			// Go through voters and pick set that voted.
+			app.validatorFreeThisRound = app.validatorFreeThisRound[:validatorCount]
+			app.validatorPriorities = app.validatorPriorities[:validatorCount]
+		}
 
-	// 	for i := range app.validatorPriorities {
-	// 		app.validatorPriorities[i] = make([]collector.Request, 0, roundAmount)
-	// 	}
-	// 	log.Info("Started source selection.")
+		for i := range app.validatorPriorities {
+			app.validatorPriorities[i] = make([]collector.Request, 0, roundAmount)
+		}
+		log.Info("Started source selection.")
 
-	// 	// NOTE(Tom): This algorithm gives earlier sources higher priority.
-	// 	for round := 0; round < roundAmount && len(app.validatorPriorities) > 0; round++ {
-	// 		// log.Info("Round:", round)
-	// 		for i := range app.validatorFreeThisRound {
-	// 			app.validatorFreeThisRound[i] = true
-	// 		}
+		// NOTE(Tom): This algorithm gives earlier sources higher priority.
+		for round := 0; round < roundAmount && len(app.validatorPriorities) > 0; round++ {
+			// log.Info("Round:", round)
+			for i := range app.validatorFreeThisRound {
+				app.validatorFreeThisRound[i] = true
+			}
 
-	// 		r.Shuffle(len(app.validatorPriorities), func(i, j int) {
-	// 			{
-	// 				temp := app.validatorFreeThisRound[j]
-	// 				app.validatorFreeThisRound[j] = app.validatorFreeThisRound[i]
-	// 				app.validatorFreeThisRound[i] = temp
-	// 			}
+			r.Shuffle(len(app.validatorPriorities), func(i, j int) {
+				{
+					temp := app.validatorFreeThisRound[j]
+					app.validatorFreeThisRound[j] = app.validatorFreeThisRound[i]
+					app.validatorFreeThisRound[i] = temp
+				}
 
-	// 			{
-	// 				temp := app.validatorPriorities[j]
-	// 				app.validatorPriorities[j] = app.validatorPriorities[i]
-	// 				app.validatorPriorities[i] = temp
-	// 			}
-	// 		})
+				{
+					temp := app.validatorPriorities[j]
+					app.validatorPriorities[j] = app.validatorPriorities[i]
+					app.validatorPriorities[i] = temp
+				}
+			})
 
-	// 		for i := range collector.Sources {
-	// 			for j := range collector.Sources[i].Topics {
-	// 				for k := range app.validatorFreeThisRound {
+			for i := range collector.Sources {
+				for j := range collector.Sources[i].Topics {
+					for k := range app.validatorFreeThisRound {
 
-	// 					if app.validatorFreeThisRound[k] {
+						if app.validatorFreeThisRound[k] {
 
-	// 						// Make sure that they're not already assigned to this source.
-	// 						alreadyAssigned := false
-	// 						for _, req := range app.validatorPriorities[k] {
-	// 							if req.Source.Name == collector.Sources[i].Name && req.Topic == j {
-	// 								alreadyAssigned = true
-	// 							}
-	// 						}
+							// Make sure that they're not already assigned to this source.
+							alreadyAssigned := false
+							for _, req := range app.validatorPriorities[k] {
+								if req.Source.Name == collector.Sources[i].Name && req.Topic == j {
+									alreadyAssigned = true
+								}
+							}
 
-	// 						if !alreadyAssigned {
-	// 							app.validatorFreeThisRound[k] = false
+							if !alreadyAssigned {
+								app.validatorFreeThisRound[k] = false
 
-	// 							req := collector.Request{
-	// 								Source: collector.Sources[i],
-	// 								Topic:  j,
-	// 							}
-	// 							app.validatorPriorities[k] = append(app.validatorPriorities[k], req)
+								req := collector.Request{
+									Source: collector.Sources[i],
+									Topic:  j,
+								}
+								app.validatorPriorities[k] = append(app.validatorPriorities[k], req)
 
-	// 							// log.Info("Found validator for source.")
-	// 							break
-	// 						}
-	// 					}
-	// 				}
-	// 			}
-	// 		}
-	// 	}
+								// log.Info("Found validator for source.")
+								break
+							}
+						}
+					}
+				}
+			}
+		}
 
-	// 	// Need to have this info available somewhere...
-	// 	// Decouple this from abci?
+		// Need to have this info available somewhere...
+		// Decouple this from abci?
 
-	// 	log.Info("Done sorting preferences, writting our requests.")
-	// 	for i := range app.validatorPriorities {
-	// 		validator := req.DecidedLastCommit.Votes[i].GetValidator()
+		log.Info("Done sorting preferences, writting our requests.")
+		for i := range app.validatorPriorities {
+			validator := req.DecidedLastCommit.Votes[i].GetValidator()
 
-	// 		temp := sha256.Sum256(app.publicKey)
-	// 		addr := temp[:20]
-	// 		log.Info(validator.Address, addr)
+			temp := sha256.Sum256(app.publicKey)
+			addr := temp[:20]
+			log.Info(validator.Address, addr)
 
-	// 		if bytes.Equal(validator.Address, addr) {
-	// 			log.Info("Found priorities for node.")
+			if bytes.Equal(validator.Address, addr) {
+				log.Info("Found priorities for node.")
 
-	// 			app.assignedRequests = app.validatorPriorities[i]
-	// 			break
-	// 		}
-	// 	}
-	// }
+				app.assignedRequests = app.validatorPriorities[i]
+				break
+			}
+		}
+	}
 
 	return &abcitypes.ResponseFinalizeBlock{
 		TxResults:        txs,

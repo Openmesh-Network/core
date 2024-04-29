@@ -6,12 +6,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	cfg "github.com/cometbft/cometbft/config"
 	cmtflags "github.com/cometbft/cometbft/libs/cli/flags"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
-	"github.com/cometbft/cometbft/libs/rand"
 	nm "github.com/cometbft/cometbft/node"
 	bftp2p "github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/privval"
@@ -197,16 +197,35 @@ func (inst *Instance) Start(ctx context.Context) {
 						}
 					}
 				} else {
+
+					requests := inst.app.GetRequestsDue()
+
+					var summaries []collector.Summary
+					if requests != nil {
+						if config.Config.BFT.MockTransactions {
+							// Mock transactions of a similar format.
+						} else {
+							summaries = inst.collector.SubmitRequests(requests)
+						}
+					} else {
+						log.Debug("No requests this block :(")
+					}
+
 					transactionPushedCount := 0
-					for i := 0; i < collector.WORKER_COUNT; i++ {
+					for i := range summaries {
+
+						s := summaries[i]
+						r := requests[i]
+
 						// Format as a transactionMessage
 						transactionMessage := otypes.Transaction{
 							Owner:     base64AddrString,
-							Signature: "",
+							Signature: strconv.Itoa(i),
 							Type:      *otypes.TransactionType_VerificationTransaction.Enum(),
 						}
 
 						// Build some dataset.
+
 						transactionMessage.Data = &otypes.Transaction_VerificationData{
 							VerificationData: &otypes.VerificationTransactionData{
 								// XXX: Actually provide attestation here.
@@ -214,8 +233,9 @@ func (inst *Instance) Start(ctx context.Context) {
 								// XXX: Need to decide how we're building the cids.
 								// There's a tradeoff between blockchain size and download speed.
 								// Make a fake but plausible CID
-								Cid:        base64.StdEncoding.EncodeToString(rand.Bytes(40)),
-								Datasource: "examplesource" + "-" + "exampletopic",
+								// - It's currently a CID per byte.
+								Cid:        s.DataHashes[0].String(),
+								Datasource: r.Source.Name + "-" + r.Source.Topics[r.Topic],
 								// XXX: Should this be the time it started being recorded or ended?
 								Timestamp: time.Now().Unix(),
 							},

@@ -9,7 +9,6 @@
 *.dylib
 
 openmesh-core
-core
 
 # Test binary, built with `go test -c`
 *.test
@@ -36,10 +35,7 @@ go.work
 .DS_Store
 executable-file
 /ignore
-<<<<<<< HEAD
-=======
 /collector/.env
->>>>>>> origin/openmesh-sink
 log.txt
 
 # Default cometbft state (config.toml is important)

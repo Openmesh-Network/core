@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,8 +13,8 @@ import (
 	"syscall"
 )
 
-const DEFAULT_NODE_COUNT = 300
-const DIR_BASE = "/data"
+const DEFAULT_NODE_COUNT = 5
+const DIR_BASE = "/tmp/cbfttest"
 const INCREMENT_IPS = false
 
 // Won't necessarily be compatible with OS ipv4.
@@ -295,8 +296,9 @@ func main() {
 			cmds[i+2] = exec.Command("./core", "-config", nodeDir+"/config.yaml")
 		}
 
-		cmds[30].Stdout = os.Stdout
-		cmds[30].Stderr = os.Stderr
+		randomNodeIndex := rand.Intn(nodeCount)
+		cmds[randomNodeIndex].Stdout = os.Stdout
+		cmds[randomNodeIndex].Stderr = os.Stderr
 	}
 
 	for i := range cmds {

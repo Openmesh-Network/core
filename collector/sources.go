@@ -117,7 +117,7 @@ func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []by
 	})
 	if err != nil {
 		fmt.Println(resp)
-		panic(err)
+		return nil, nil, err
 	}
 
 	request := strings.Replace(source.Request, "{{topic}}", topic, 1)
@@ -132,8 +132,7 @@ func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []by
 		defer close(msgChannel)
 		defer close(errChannel)
 		for {
-			ntype, n, err := ws.Read(ctx)
-			fmt.Printf("Received message of type: %s\n", ntype)
+			_, n, err := ws.Read(ctx)
 			if err != nil {
 				errChannel <- err
 				return
@@ -173,8 +172,7 @@ func okxJoinCEX(ctx context.Context, source Source, topic string) (chan []byte, 
 		defer close(msgChannel)
 		defer close(errChannel)
 		for {
-			ntype, n, err := ws.Read(ctx)
-			fmt.Printf("Received message of type: %s", ntype)
+			_, n, err := ws.Read(ctx)
 			if err != nil {
 				errChannel <- err
 				return

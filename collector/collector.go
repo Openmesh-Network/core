@@ -15,9 +15,6 @@ type Request struct {
 }
 
 type Summary struct {
-	// XXX: This might not be efficient, array of pointers means many cache misses.
-	// Not sure if the Go compiler will realize we want these sequentially in memory.
-	// But whatever man we're only doing a handfull of these a second.
 	DataHashes []cid.Cid
 }
 
@@ -93,6 +90,7 @@ func (ci *CollectorInstance) SubmitRequests(requestsSortedByPriority []Request) 
 
 		// Have to declare variable here otherwise go will pass i as value and cause problems.
 		index := i
+
 		subscribeFunc := func() {
 			r := requestsSortedByPriority[index]
 
@@ -102,13 +100,14 @@ func (ci *CollectorInstance) SubmitRequests(requestsSortedByPriority []Request) 
 
 			log.Info("Subscribing ", index)
 			messageChannel, err := Subscribe(ci.subscriptionsContext, r.Source, r.Source.Topics[r.Topic])
-			if err != nil {
-				// XXX: Handle this case by skipping this request.
-				// Panicking now to highlight this.
-				panic(err)
-			}
 
-			ci.workers[index].message = messageChannel
+			// XXX: Handle this case by skipping this request.
+			// Worker will do nothing for this period. Maybe optimize this?
+			if err != nil {
+				log.Warn("Couldnt connect to source: ", r.Source.Name, "-", r.Source.Topics[r.Topic], ", skipping instead. Reason: ", err)
+			} else {
+				ci.workers[index].message = messageChannel
+			}
 		}
 
 		subscribeWaitGroup.Go(subscribeFunc)

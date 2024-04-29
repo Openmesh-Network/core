@@ -7,6 +7,8 @@ p2p:
   peerLimit: 50
 bft:
   homeDir: cbft-home
+  mockTransactions: false
+  skipSourceSelection: false
 db:
   username: username
   password: password
