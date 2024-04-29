@@ -5,22 +5,25 @@ import (
 	"github.com/multiformats/go-multicodec"
 )
 
-// What I want.
 const DEFAULT_CHUNK_SIZE = 4096
 
 // Keeps track of Cids in data.
 type Stream struct {
-	buffer      []byte
-	offset      int
-	chunkHashes []cid.Cid
+	buffer    []byte
+	cidHashes []cid.Cid
 }
 
 func NewStream() *Stream {
 	return &Stream{
 		make([]byte, 0, DEFAULT_CHUNK_SIZE),
-		0,
 		make([]cid.Cid, 0),
 	}
+}
+
+// Resets the cids and the buffer to 0.
+func (s *Stream) Reset() {
+	s.buffer = s.buffer[:0]
+	s.cidHashes = s.cidHashes[:0]
 }
 
 func (s *Stream) Flush() {
@@ -42,7 +45,7 @@ func (s *Stream) Flush() {
 			// If this fails to parse a buffer the input is invalid.
 			panic(err)
 		}
-		s.chunkHashes = append(s.chunkHashes, c)
+		s.cidHashes = append(s.cidHashes, c)
 	}
 
 	// Reset buffer.
@@ -55,13 +58,11 @@ func (s *Stream) Append(message []byte) {
 	// - Indicating message is fragmented somewhere.
 	// - Assuming this never happens.
 	// - Etc
-	if len(message) > cap(s.buffer) {
+	for len(message) > cap(s.buffer) {
 		// Append as unique messages, until we reached a message size that can be used.
 		// WARN: Do NOT multithread any of this code. All this logic depends on being run sequentially.
-		for len(message) > cap(s.buffer) {
-			s.Append(message)
-			message = message[cap(s.buffer):]
-		}
+		s.Append(message[:cap(s.buffer)])
+		message = message[cap(s.buffer):]
 	}
 
 	// If buffer will become full.
@@ -73,4 +74,6 @@ func (s *Stream) Append(message []byte) {
 	s.buffer = append(s.buffer, message...)
 }
 
-// Add a stream to ipfs.
+func (s *Stream) GetCids() []cid.Cid {
+	return s.cidHashes
+}

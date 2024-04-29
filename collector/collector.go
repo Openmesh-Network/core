@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/ipfs/go-cid"
-	"github.com/multiformats/go-multicodec"
 	log "github.com/openmesh-network/core/internal/logger"
+	"github.com/openmesh-network/core/resourcepool"
 	"github.com/sourcegraph/conc"
 )
 
@@ -19,9 +19,10 @@ type Summary struct {
 }
 
 type CollectorWorker struct {
-	summary *Summary
-	request Request
-	message chan []byte
+	summary  *Summary
+	request  Request
+	message  chan []byte
+	rpStream *resourcepool.Stream
 
 	// Could make these into the same function.
 	pause  chan bool
@@ -40,7 +41,7 @@ type CollectorInstance struct {
 	subscriptionsCancel       context.CancelFunc
 }
 
-const WORKER_COUNT = 5
+const WORKER_COUNT = 1
 
 // const BUFFER_SIZE_MAX = 1024
 // const BUFFER_MAX = 1024
@@ -126,42 +127,9 @@ func (ci *CollectorInstance) SubmitRequests(requestsSortedByPriority []Request) 
 	return ci.summariesOld[:maxSummaries]
 }
 
-func (cw *CollectorWorker) run(ctx context.Context, buffer []byte) {
+func (cw *CollectorWorker) run(ctx context.Context) {
 	log.Info("Started worker.")
 
-	if buffer == nil {
-		panic("Buffer is nil dummy.")
-	}
-	if len(buffer) < 100 {
-		panic("Buffer is too small, is this an error?")
-	}
-
-	// XXX: Maybe move this function to RP? Also it will crash if length == 0
-	// Also I could move this to another function.
-	summaryAppend := func(summary *Summary, buffer []byte, length int) {
-		// TODO: Consider adding:
-		//	- Timestamp.
-		//	- Fragmentation flag (Whether there is a half message or not).
-		//	- Message count.
-
-		cidBuilder := cid.V1Builder{
-			Codec:    uint64(multicodec.DagPb),
-			MhType:   uint64(multicodec.Sha2_256),
-			MhLength: -1,
-		}
-
-		c, err := cidBuilder.Sum(buffer[0:length])
-		if err != nil {
-			// If this fails to parse a buffer the input is invalid.
-			panic(err)
-		}
-
-		summary.DataHashes = append(summary.DataHashes, c)
-
-		log.Info("Added ", length, "  bytes, now: ", c.String())
-	}
-
-	bufferOffset := 0
 	printedDebug := false
 	paused := false
 	log.Info("Running for loop.")
@@ -176,6 +144,7 @@ func (cw *CollectorWorker) run(ctx context.Context, buffer []byte) {
 				case <-cw.resume:
 					log.Info("Worker resumed.")
 					// Clear the summary cid buffer.
+					cw.rpStream.Reset()
 					cw.summary.DataHashes = cw.summary.DataHashes[:0]
 					paused = false
 
@@ -188,16 +157,15 @@ func (cw *CollectorWorker) run(ctx context.Context, buffer []byte) {
 					log.Info("Channel stopped.")
 
 					// Flush the buffer!
-					if len(buffer) > 0 {
-						log.Info("Flushed")
-						summaryAppend(cw.summary, buffer, len(buffer))
-					}
+					cw.rpStream.Flush()
 
 					// Hopefully go will just call memset here...
-					for i := range buffer {
-						buffer[i] = 0
-					}
-					bufferOffset = 0
+					log.Debug("One: ", len(cw.rpStream.GetCids()))
+					log.Debug("Two: ", len(cw.summary.DataHashes))
+
+					cw.summary.DataHashes = make([]cid.Cid, len(cw.rpStream.GetCids()))
+
+					copy(cw.summary.DataHashes[:], cw.rpStream.GetCids())
 
 					log.Info("Worker paused until resume is called.")
 					paused = true
@@ -214,26 +182,7 @@ func (cw *CollectorWorker) run(ctx context.Context, buffer []byte) {
 						break
 					}
 
-					if bufferOffset+len(message) > len(buffer) {
-						// TODO: Add to Resource Pool from here?
-						summaryAppend(cw.summary, buffer, bufferOffset)
-						bufferOffset = 0
-					}
-
-					// If the message still doesn't fit, divide it into chunks and add it until it fits.
-					for len(message) > len(buffer) {
-						// XXX: Should the cids we post be capped at the length of the buffer?
-						// Or can they be any size? For now I assume they are capped at the size of the buffer.
-						// Do we do padding? Need a spreadsheet to "empirically" test this.
-						summaryAppend(cw.summary, message, len(buffer))
-						message = message[len(buffer):]
-					}
-
-					// Add message to buffer.
-					copy(buffer[bufferOffset:], message)
-					// log.Info("Done here.")
-
-					bufferOffset += len(message)
+					cw.rpStream.Append(message)
 				}
 			}
 		}
@@ -245,14 +194,14 @@ func (ci *CollectorInstance) Start(ctx context.Context) {
 	ci.ctx = ctx
 
 	for i := range ci.workers {
-		buffer := make([]byte, 4096)
 		ci.workers[i].pause = make(chan bool)
 		ci.workers[i].resume = make(chan bool)
 		ci.workers[i].message = make(chan []byte)
 		ci.workers[i].summary = &ci.summariesNew[i]
+		ci.workers[i].rpStream = resourcepool.NewStream()
 
 		index := i
-		runFunc := func() { ci.workers[index].run(ci.ctx, buffer) }
+		runFunc := func() { ci.workers[index].run(ci.ctx) }
 
 		log.Infof("Deploying worker for collector.")
 		ci.workerWaitGroup.Go(runFunc)
