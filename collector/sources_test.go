@@ -209,3 +209,17 @@ func TestAnkrPolygonJoin(t *testing.T) {
 		t.Log("This ran")
 	}
 }
+
+// use timeout flag : go test -timeout 600s -run TestSourcesDataSize
+func TestSourcesDataSize(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dataWriter, err := NewDataWriter("data_size1.csv")
+	if err != nil {
+		t.Fatal("Error creating writer.")
+	}
+	// Time period to collect datd : Seconds (integer values only. !)
+	var timeToCollect int = 60
+	var windowTimeFrame int = 10
+	CalculateDataSize(t, ctx, dataWriter, timeToCollect, windowTimeFrame)
+}
