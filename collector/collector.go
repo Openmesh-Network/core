@@ -43,7 +43,7 @@ type CollectorInstance struct {
 	subscriptionsCancel       context.CancelFunc
 }
 
-const WORKER_COUNT = 1
+const WORKER_COUNT = 5
 
 // const BUFFER_SIZE_MAX = 1024
 // const BUFFER_MAX = 1024

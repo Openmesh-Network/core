@@ -29,13 +29,19 @@ go.work
 # Visual Studio Code
 .vscode
 
+# Secrets & blockchain data
+/collector/.env
+cbft-home/data
+cbft-home/config/node_key.json
+cbft-home/config/priv_validator_key.json
+cbft-home/config/addrbook.json
+cbft-home/config/genesis.json
+
+
 # Arbitrary trashes
 .DS_Store
-
 executable-file
-
 /ignore
-/collector/.env
 log.txt
 
 # Default cometbft state (config.toml is important)
