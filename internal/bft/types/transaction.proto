@@ -6,6 +6,7 @@ enum TransactionType {
   VerificationTransaction = 1;
   ResourceTransaction = 2;
   NodeRegistrationTransaction = 3;
+  SummaryTransaction = 4;
 }
 
 message VerificationTransactionData {
@@ -32,6 +33,11 @@ message NodeRegistrationTransactionData {
   string nodeSignature = 3;
 }
 
+message SummaryTransactionData {
+  string hash = 1;
+  int64 numTx = 2;
+}
+
 message Transaction {
   string owner = 1;
   string signature = 2;
@@ -41,5 +47,6 @@ message Transaction {
     ResourceTransactionData resourceData = 5; 
     NormalTransactionData normalData = 6; 
     NodeRegistrationTransactionData nodeRegistrationData = 7; 
+    SummaryTransactionData SummaryTransactionData = 8;
   }
 }

@@ -95,6 +95,7 @@ func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instan
 		nm.DefaultMetricsProvider(conf.Instrumentation),
 		log,
 	)
+	app.Node = node
 
 	// events := node.EventBus()
 	// data := types.EventDataTx{}
