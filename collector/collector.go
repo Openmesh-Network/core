@@ -30,6 +30,7 @@ type CollectorWorker struct {
 }
 
 type CollectorInstance struct {
+	rpInstance                *resourcepool.Instance
 	ctx                       context.Context
 	workers                   [WORKER_COUNT]CollectorWorker
 	workerWaitGroup           conc.WaitGroup
@@ -46,8 +47,8 @@ const WORKER_COUNT = 1
 // const BUFFER_SIZE_MAX = 1024
 // const BUFFER_MAX = 1024
 
-func New() *CollectorInstance {
-	return &CollectorInstance{}
+func NewInstance(rpInstance *resourcepool.Instance) *CollectorInstance {
+	return &CollectorInstance{rpInstance: rpInstance}
 }
 
 func (ci *CollectorInstance) SubmitRequests(requestsSortedByPriority []Request) []Summary {
@@ -160,8 +161,6 @@ func (cw *CollectorWorker) run(ctx context.Context) {
 					cw.rpStream.Flush()
 
 					// Hopefully go will just call memset here...
-					log.Debug("One: ", len(cw.rpStream.GetCids()))
-					log.Debug("Two: ", len(cw.summary.DataHashes))
 
 					cw.summary.DataHashes = make([]cid.Cid, len(cw.rpStream.GetCids()))
 
@@ -198,7 +197,7 @@ func (ci *CollectorInstance) Start(ctx context.Context) {
 		ci.workers[i].resume = make(chan bool)
 		ci.workers[i].message = make(chan []byte)
 		ci.workers[i].summary = &ci.summariesNew[i]
-		ci.workers[i].rpStream = resourcepool.NewStream()
+		ci.workers[i].rpStream = ci.rpInstance.NewStream()
 
 		index := i
 		runFunc := func() { ci.workers[index].run(ci.ctx) }

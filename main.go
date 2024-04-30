@@ -18,12 +18,13 @@ import (
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/networking/p2p"
+	rp "github.com/openmesh-network/core/resourcepool"
 	"github.com/openmesh-network/core/updater"
 )
 
 const (
 	useRuntimeConfigFile = true
-	debugMinimalBuild         = false
+	debugMinimalBuild    = false
 )
 
 var (
@@ -74,12 +75,16 @@ func main() {
 		logger.Fatalf("Failed to establish BadgerDB connection: %s", err.Error())
 	}
 
+	rpInstance := rp.NewInstance(p2pInstance)
+	rpInstance.Start(cancelCtx)
+	defer rpInstance.Stop()
+
 	// Need collector before bft.
 	var collectorInstance *collector.CollectorInstance
 	if debugMinimalBuild {
 		collectorInstance = nil
 	} else {
-		collectorInstance = collector.New()
+		collectorInstance = collector.NewInstance(rpInstance)
 		collectorInstance.Start(cancelCtx)
 	}
 

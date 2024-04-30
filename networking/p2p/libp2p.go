@@ -53,6 +53,13 @@ func (i *Instance) SetP2PHost(existingHost *host.Host) *Instance {
 	return i
 }
 
+func HostToString(h host.Host) string {
+	hostAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", h.ID().String()))
+
+	addr := h.Addrs()[0]
+	return addr.Encapsulate(hostAddr).String()
+}
+
 // Build constructs the P2P instance using the given configuration.
 func (i *Instance) Build() (*Instance, error) {
 	var err error
@@ -88,6 +95,7 @@ func (i *Instance) Build() (*Instance, error) {
 	}
 
 	log.Printf("Successfully initialised a libp2p instance with ID %s", (*i.Host).ID())
+	log.Printf("Multiaddr is: %s\n", HostToString(*i.Host))
 	return i, nil
 }
 
