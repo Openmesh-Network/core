@@ -109,6 +109,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 			return string(app.CurrentMempool[i]) < string(app.CurrentMempool[j])
 		})
 	}
+	log.Error("Sorting Done")
 	var result []byte
 	var othertx = [][]byte{}
 	for _, slice := range app.CurrentMempool {
@@ -127,6 +128,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 
 	}
 
+	log.Error("Merging Done")
 	hash := sha256.Sum256(result)
 	hashString := base64.StdEncoding.EncodeToString(hash[:])
 
@@ -166,6 +168,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 			}
 		}
 	}
+	log.Error("Signing Done")
 
 	return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_ACCEPT}, nil
 }
