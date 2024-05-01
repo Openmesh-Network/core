@@ -28,6 +28,7 @@ type VerificationApp struct {
 	validatorFreeThisRound []bool
 	Node                   *nm.Node
 	CurrentMempool         []comettype.Tx
+	Currblockno            int64
 }
 
 const VALIDATOR_PREALLOCATED_COUNT = 2000
@@ -378,7 +379,7 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 	// 		}
 	// 	}
 	// }
-
+	app.Currblockno = req.Height
 	return &abcitypes.ResponseFinalizeBlock{
 		TxResults:        txs,
 		ValidatorUpdates: validatorupdates,
@@ -430,6 +431,20 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 		// log.Info("Normal Transaction Data:", normalData)
 		return 0
 	case types.TransactionType_VerificationTransaction:
+		verificationData := &types.VerificationTransactionData{}
+		verificationData = transaction.GetVerificationData()
+		// log.Info("Verification Transaction Data:", verificationData)
+		if verificationData == nil {
+			log.Error("Error unmarshaling verification data", err)
+			return 1
+		}
+		if verificationData.GetHeight() <= app.Currblockno {
+			log.Error("the transaction will be rejected due to blockheigh", app.Currblockno, verificationData.GetHeight())
+			return 1
+
+		}
+
+		return 0
 		// verificationData := &types.VerificationTransactionData{}
 		// verificationData = transaction.GetVerificationData()
 		// log.Info("Verification Transaction Data:", verificationData)

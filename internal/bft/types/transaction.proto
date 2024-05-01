@@ -14,6 +14,7 @@ message VerificationTransactionData {
   string cid = 2;
   string datasource = 3;
   int64 timestamp = 4;
+  int64 height = 5;
 }
 
 message ResourceTransactionData {

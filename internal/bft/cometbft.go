@@ -198,6 +198,10 @@ func (inst *Instance) Start(ctx context.Context) {
 						}
 					}
 				} else {
+					res, err := env.Status(&rpctypes.Context{})
+					if err != nil {
+						panic(err)
+					}
 					transactionPushedCount := 0
 					for i := 0; i < collector.WORKER_COUNT; i++ {
 						// Format as a transactionMessage
@@ -219,6 +223,7 @@ func (inst *Instance) Start(ctx context.Context) {
 								Datasource: "examplesource" + "-" + "exampletopic",
 								// XXX: Should this be the time it started being recorded or ended?
 								Timestamp: time.Now().Unix(),
+								Height:    res.SyncInfo.LatestBlockHeight + 2,
 							},
 						}
 
