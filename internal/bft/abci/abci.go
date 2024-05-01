@@ -56,6 +56,7 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 			return string(proposal.Txs[i]) < string(proposal.Txs[j])
 		})
 	}
+	log.Error("Sorting Done")
 	for _, slice := range proposal.Txs {
 		var transaction types.Transaction
 		err := proto.Unmarshal(slice, &transaction)
@@ -71,6 +72,7 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 		}
 
 	}
+	log.Error("Merging Done")
 
 	hash := sha256.Sum256(result)
 	hashString := base64.StdEncoding.EncodeToString(hash[:])
@@ -89,7 +91,7 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 	if err != nil {
 		panic(err)
 	}
-
+	log.Error("Marshaling Done")
 	transactions := comettype.Tx(transactionBytes[:])
 	proposal.Txs = append(othertx, transactions)
 
