@@ -3,6 +3,7 @@ package verificationApp
 import (
 	"context"
 	"encoding/base64"
+	"sort"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	nm "github.com/cometbft/cometbft/node"
@@ -50,6 +51,11 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 
 	var result []byte
 	var othertx = [][]byte{}
+	if len(proposal.Txs) > 2 {
+		sort.Slice(proposal.Txs, func(i, j int) bool {
+			return string(proposal.Txs[i]) < string(proposal.Txs[j])
+		})
+	}
 	for _, slice := range proposal.Txs {
 		var transaction types.Transaction
 		err := proto.Unmarshal(slice, &transaction)
@@ -96,6 +102,11 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 	total_tx := app.Node.Mempool().ReapMaxTxs(-1)
 
 	app.CurrentMempool = total_tx
+	if len(app.CurrentMempool) > 2 {
+		sort.Slice(app.CurrentMempool, func(i, j int) bool {
+			return string(app.CurrentMempool[i]) < string(app.CurrentMempool[j])
+		})
+	}
 	var result []byte
 	var othertx = [][]byte{}
 	for _, slice := range app.CurrentMempool {
