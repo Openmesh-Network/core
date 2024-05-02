@@ -20,21 +20,45 @@ import (
 )
 
 type VerificationApp struct {
-	db                     *badger.DB
-	onGoingBlock           *badger.Txn
-	publicKey              []byte
-	assignedRequests       []collector.Request
-	validatorPriorities    [][]collector.Request
-	validatorFreeThisRound []bool
+	db                         *badger.DB
+	onGoingBlock               *badger.Txn
+	publicKey                  []byte
+	validatorPrioritiesCurrent [][]collector.Request
+	validatorPrioritiesNext    [][]collector.Request
+	validatorFreeThisRound     []bool
+	votesCurrent               []abcitypes.VoteInfo
+	votesNext                  []abcitypes.VoteInfo
 }
 
 const VALIDATOR_PREALLOCATED_COUNT = 2000
 
 var _ abcitypes.Application = (*VerificationApp)(nil)
 
-func (app *VerificationApp) GetRequestsDue() []collector.Request {
-	return app.assignedRequests
+func findAddressInPriorities(publicKey []byte, votes []abcitypes.VoteInfo, priorities [][]collector.Request) []collector.Request {
+	for i := range priorities {
+		validator := votes[i].GetValidator()
+
+		temp := sha256.Sum256(publicKey)
+		addr := temp[:20]
+		log.Info(validator.Address, addr)
+
+		if bytes.Equal(validator.Address, addr) {
+			log.Info("Found priorities for node.")
+
+			return priorities[i]
+		}
+	}
+
+	return nil
 }
+
+func (app *VerificationApp) GetRequestsDue() []collector.Request {
+	return findAddressInPriorities(app.publicKey, app.votesCurrent, app.validatorPrioritiesCurrent)
+}
+func (app *VerificationApp) GetRequestsDueNext() []collector.Request {
+	return findAddressInPriorities(app.publicKey, app.votesNext, app.validatorPrioritiesNext)
+}
+
 func (app *VerificationApp) InitChain(_ context.Context, chain *abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
 	return &abcitypes.ResponseInitChain{}, nil
 }
@@ -183,33 +207,40 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 			r = rand.New(rand.NewSource(seed))
 		}
 
+		app.validatorPrioritiesCurrent = app.validatorPrioritiesCurrent[:0]
+		app.validatorPrioritiesCurrent = append(app.validatorPrioritiesCurrent, app.validatorPrioritiesNext...)
+
+		app.votesCurrent = app.votesCurrent[:0]
+		app.votesCurrent = append(app.votesCurrent, app.votesNext...)
+
+		app.votesNext = req.DecidedLastCommit.Votes
+
 		// Not sure what the right number of rounds is :shrug:. Chosing arbitrarily.
-		roundAmount := 10
-		validatorCount := len(req.DecidedLastCommit.Votes)
+		roundAmount := 1
+		validatorCount := len(app.votesNext)
 
 		if validatorCount > VALIDATOR_PREALLOCATED_COUNT {
 			// XXX: Handle more intelligently.
 			app.validatorFreeThisRound = make([]bool, validatorCount)
-			app.validatorPriorities = make([][]collector.Request, validatorCount)
+			app.validatorPrioritiesNext = make([][]collector.Request, validatorCount)
 		} else {
 			// Go through voters and pick set that voted.
 			app.validatorFreeThisRound = app.validatorFreeThisRound[:validatorCount]
-			app.validatorPriorities = app.validatorPriorities[:validatorCount]
+			app.validatorPrioritiesNext = app.validatorPrioritiesNext[:validatorCount]
 		}
 
-		for i := range app.validatorPriorities {
-			app.validatorPriorities[i] = make([]collector.Request, 0, roundAmount)
+		for i := range app.validatorPrioritiesNext {
+			app.validatorPrioritiesNext[i] = make([]collector.Request, 0, roundAmount)
 		}
 		log.Info("Started source selection.")
 
 		// NOTE(Tom): This algorithm gives earlier sources higher priority.
-		for round := 0; round < roundAmount && len(app.validatorPriorities) > 0; round++ {
-			// log.Info("Round:", round)
+		for round := 0; round < roundAmount && len(app.validatorPrioritiesNext) > 0; round++ {
 			for i := range app.validatorFreeThisRound {
 				app.validatorFreeThisRound[i] = true
 			}
 
-			r.Shuffle(len(app.validatorPriorities), func(i, j int) {
+			r.Shuffle(len(app.validatorPrioritiesNext), func(i, j int) {
 				{
 					temp := app.validatorFreeThisRound[j]
 					app.validatorFreeThisRound[j] = app.validatorFreeThisRound[i]
@@ -217,9 +248,9 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 				}
 
 				{
-					temp := app.validatorPriorities[j]
-					app.validatorPriorities[j] = app.validatorPriorities[i]
-					app.validatorPriorities[i] = temp
+					temp := app.validatorPrioritiesNext[j]
+					app.validatorPrioritiesNext[j] = app.validatorPrioritiesNext[i]
+					app.validatorPrioritiesNext[i] = temp
 				}
 			})
 
@@ -231,7 +262,7 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 
 							// Make sure that they're not already assigned to this source.
 							alreadyAssigned := false
-							for _, req := range app.validatorPriorities[k] {
+							for _, req := range app.validatorPrioritiesNext[k] {
 								if req.Source.Name == collector.Sources[i].Name && req.Topic == j {
 									alreadyAssigned = true
 								}
@@ -244,9 +275,8 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 									Source: collector.Sources[i],
 									Topic:  j,
 								}
-								app.validatorPriorities[k] = append(app.validatorPriorities[k], req)
+								app.validatorPrioritiesNext[k] = append(app.validatorPrioritiesNext[k], req)
 
-								// log.Info("Found validator for source.")
 								break
 							}
 						}
@@ -256,23 +286,11 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 		}
 
 		// Need to have this info available somewhere...
-		// Decouple this from abci?
+
+		// XXX: Remove this from finalizeblock? Remove from abci?
+		// Only run this when requested maybe?
 
 		log.Info("Done sorting preferences, writting our requests.")
-		for i := range app.validatorPriorities {
-			validator := req.DecidedLastCommit.Votes[i].GetValidator()
-
-			temp := sha256.Sum256(app.publicKey)
-			addr := temp[:20]
-			log.Info(validator.Address, addr)
-
-			if bytes.Equal(validator.Address, addr) {
-				log.Info("Found priorities for node.")
-
-				app.assignedRequests = app.validatorPriorities[i]
-				break
-			}
-		}
 	}
 
 	return &abcitypes.ResponseFinalizeBlock{
@@ -371,10 +389,13 @@ func (app *VerificationApp) CheckTx(_ context.Context, check *abcitypes.RequestC
 
 func NewVerificationApp(publicKey []byte, db *badger.DB) *VerificationApp {
 	return &VerificationApp{
-		publicKey:              publicKey,
-		validatorPriorities:    make([][]collector.Request, 0, VALIDATOR_PREALLOCATED_COUNT),
-		validatorFreeThisRound: make([]bool, 0, VALIDATOR_PREALLOCATED_COUNT),
-		db:                     db}
+		publicKey:                  publicKey,
+		votesNext:                  make([]abcitypes.VoteInfo, 0, 100),
+		votesCurrent:               make([]abcitypes.VoteInfo, 0, 100),
+		validatorPrioritiesCurrent: make([][]collector.Request, 0, VALIDATOR_PREALLOCATED_COUNT),
+		validatorPrioritiesNext:    make([][]collector.Request, 0, VALIDATOR_PREALLOCATED_COUNT),
+		validatorFreeThisRound:     make([]bool, 0, VALIDATOR_PREALLOCATED_COUNT),
+		db:                         db}
 }
 
 /**

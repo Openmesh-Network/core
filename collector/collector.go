@@ -52,10 +52,8 @@ func NewInstance(rpInstance *resourcepool.Instance) *CollectorInstance {
 }
 
 func (ci *CollectorInstance) SubmitRequests(requestsSortedByPriority []Request) []Summary {
-	// XXX: Wasteful, shouldn't have to remake but whatever.
-	ci.requestsByPriorityNew = make([]Request, len(requestsSortedByPriority))
-
-	copy(ci.requestsByPriorityNew, requestsSortedByPriority)
+	ci.requestsByPriorityNew = ci.requestsByPriorityNew[:0]
+	ci.requestsByPriorityNew = append(ci.requestsByPriorityNew, requestsSortedByPriority...)
 
 	if ci.subscriptionsCancel != nil {
 		ci.subscriptionsCancel()

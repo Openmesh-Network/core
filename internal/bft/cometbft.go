@@ -199,6 +199,10 @@ func (inst *Instance) Start(ctx context.Context) {
 				} else {
 
 					requests := inst.app.GetRequestsDue()
+					requestsNext := inst.app.GetRequestsDueNext()
+
+					log.Info("Requests for now: ", requests)
+					log.Info("Requests for later: ", requestsNext)
 
 					var summaries []collector.Summary
 					if requests != nil {

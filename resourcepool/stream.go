@@ -37,14 +37,18 @@ func (s *Stream) Flush() {
 	}
 
 	{
-		bufferCopy := make([]byte, len(s.buffer))
-		copy(bufferCopy, s.buffer[:])
-		block := blocks.NewBlock(bufferCopy)
-		c := block.Cid()
+		// XXX: Maybe move this to other resource pool function.
+		var c cid.Cid
+		{
+			bufferCopy := make([]byte, len(s.buffer))
+			copy(bufferCopy, s.buffer[:])
+			block := blocks.NewBlock(bufferCopy)
+			c = block.Cid()
 
-		err := s.inst.Bservice.AddBlock(context.Background(), block)
-		if err != nil {
-			panic(err)
+			err := s.inst.Bservice.AddBlock(context.Background(), block)
+			if err != nil {
+				panic(err)
+			}
 		}
 
 		s.cidHashes = append(s.cidHashes, c)
