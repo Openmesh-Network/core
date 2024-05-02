@@ -5,7 +5,7 @@ import (
 	"github.com/openmesh-network/core/internal/logger"
 )
 
-// Instance is the instance that holds the database connection
+// Instance is the instance that holds the database connection for BadgerDB
 type Instance struct {
 	Conn *badger.DB
 }

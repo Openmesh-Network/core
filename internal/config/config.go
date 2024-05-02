@@ -18,7 +18,6 @@ type config struct {
 	DB  DBConfig  `yaml:"db"`
 }
 
-// P2pConfig is the configuration for libp2p-related instances
 type P2pConfig struct {
 	Addr      string `yaml:"addr"`      // libp2p listening address (default: 0.0.0.0)
 	Port      int    `yaml:"port"`      // libp2p listening port
@@ -37,7 +36,9 @@ type DBConfig struct {
 
 // BFTConfig is the configuration for using CometBFT
 type BFTConfig struct {
-	HomeDir string `yaml:"homeDir"` // Path to CometBFT config
+	HomeDir             string `yaml:"homeDir"`           // Path to CometBFT config
+	MockTransactions    bool   `yaml:"mockTransactions"`    // Mock transacitons
+	SkipSourceSelection bool   `yaml:"skipSourceSelection"` // Source field selection
 }
 
 // LogConfig is the configuration for zap logger
@@ -71,24 +72,23 @@ type CollectorConfig struct {
 }
 
 // ParseConfig parses the yml configuration file and initialise the Config variable
-func ParseConfig(configAtCompileTime string, allowRuntimeConfigFile bool) {
+func ParseConfig(configAtCompileTime string, useRuntimeConfigFile bool) {
 	coreConf := viper.New()
 
-	if Name == "" {
+	if !useRuntimeConfigFile {
 		r := strings.NewReader(configAtCompileTime)
 		if err := coreConf.ReadConfig(r); err != nil {
 			// This should NEVER run! We can't allow faulty configs to be compiled to the executable.
 			panic(err)
 		}
-	} else if allowRuntimeConfigFile {
+	} else {
 		coreConf.AddConfigPath(Path)
 		coreConf.SetConfigName(Name)
 		coreConf.SetConfigType("yaml")
+
 		if err := coreConf.ReadInConfig(); err != nil {
 			log.Fatalf("Failed to read the configuration: %s", err.Error())
 		}
-	} else {
-		log.Fatalf("No config file found in compiled binary and no runtime config file allowed.")
 	}
 
 	if err := coreConf.Unmarshal(&Config); err != nil {

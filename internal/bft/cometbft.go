@@ -3,6 +3,7 @@ package bft
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strconv"
@@ -30,11 +31,13 @@ import (
 
 // Instance is the CometBFT instance
 type Instance struct {
-	Config    *cfg.Config
-	BftNode   *nm.Node
-	Collector *collector.CollectorInstance
-	app       *abci.VerificationApp
-	collector *collector.CollectorInstance
+	Config     *cfg.Config
+	Addr       []byte
+	BftNode    *nm.Node
+	Collector  *collector.CollectorInstance
+	app        *abci.VerificationApp
+	collector  *collector.CollectorInstance
+	FullPubKey []byte
 }
 
 // NewInstance initialise a CometBFT instance use the config specified
@@ -100,17 +103,24 @@ func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instan
 		return nil, err
 	}
 
-	return &Instance{Config: conf, BftNode: node, app: app, collector: collector}, nil
+	temp := sha256.Sum256(publicKey.Bytes())
+	InstancePub := publicKey.Bytes()
+	return &Instance{Config: conf, BftNode: node, app: app, collector: collector, Addr: temp[:20], FullPubKey: InstancePub}, nil
 }
 
 // Start the CometBFT node
 func (inst *Instance) Start(ctx context.Context) {
 	eventBus := inst.BftNode.EventBus()
 
-	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryNewBlock)
+	base64AddrString := base64.StdEncoding.EncodeToString(inst.FullPubKey)
+
+	newBlock, err := eventBus.Subscribe(ctx, "mainId", types.EventQueryValidBlock)
 	if err != nil {
 		panic(err)
 	}
+
+	registered := false
+	registerSentTransaction := false
 
 	// Event handler
 	go func() {
@@ -123,29 +133,98 @@ func (inst *Instance) Start(ctx context.Context) {
 				eventBus.UnsubscribeAll(ctx, "mainId")
 				return
 			case <-newBlock.Out():
-				requests := inst.app.GetRequestsDue()
-
-				var summaries []collector.Summary
-				if requests != nil {
-					summaries = inst.collector.SubmitRequests(requests)
-				} else {
-					log.Debug("No requests this block :(")
+				env, err := inst.BftNode.ConfigureRPC()
+				if err != nil {
+					panic(err)
 				}
 
-				for i := range summaries {
-					log.Debug("Went through: ", i, " summaries. ", summaries[i])
-					s := summaries[i]
-					r := requests[i]
+				// If not connected, then connect!
+				if !registered {
+					res, err := env.Status(&rpctypes.Context{})
+					if err != nil {
+						panic(err)
+					}
 
-					if len(s.DataHashes) < 1 {
-						log.Debug("No hash for this source :(")
+					// Now you can access the fields of the ResultStatus struct
+					log.Warn("Latest block height: ", res.SyncInfo.LatestBlockHeight)
+
+					if res.SyncInfo.LatestBlockHeight > 0 {
+
+						validatorSet, err := env.StateStore.LoadValidators(res.SyncInfo.LatestBlockHeight)
+						if err != nil {
+							panic(err)
+						}
+
+						temp := sha256.Sum256(inst.FullPubKey)
+						addr := temp[:20]
+
+						if validatorSet.HasAddress(addr) {
+							log.Info("Turns out we're registered!")
+							registered = true
+						}
+
+						if !registerSentTransaction {
+							transactionMessage := otypes.Transaction{
+								Owner:     base64AddrString,
+								Signature: "",
+								Type:      *otypes.TransactionType_NodeRegistrationTransaction.Enum(),
+								Data: &otypes.Transaction_NodeRegistrationData{
+									NodeRegistrationData: &otypes.NodeRegistrationTransactionData{
+										NodeAddress:     base64AddrString,
+										NodeAttestation: "",
+										NodeSignature:   "",
+									},
+								},
+							}
+
+							transactionBytes, err := proto.Marshal(&transactionMessage)
+							if err != nil {
+								panic(err)
+							}
+
+							transaction := types.Tx(transactionBytes[:])
+
+							log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
+							_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
+
+							if err != nil {
+								log.Error("Failed to push registration transaction: ", err)
+								// panic(err)
+							} else {
+								log.Debug("Succesfully pushed registration transaction!")
+								registerSentTransaction = true
+							}
+						}
+					}
+				} else {
+
+					requests := inst.app.GetRequestsDue()
+
+					var summaries []collector.Summary
+					if requests != nil {
+						if config.Config.BFT.MockTransactions {
+							// Mock transactions of a similar format.
+						} else {
+							summaries = inst.collector.SubmitRequests(requests)
+						}
 					} else {
+						log.Debug("No requests this block :(")
+					}
+
+					transactionPushedCount := 0
+					for i := range summaries {
+
+						s := summaries[i]
+						r := requests[i]
+
 						// Format as a transactionMessage
 						transactionMessage := otypes.Transaction{
-							Owner:     "John Doe",
+							Owner:     base64AddrString,
 							Signature: strconv.Itoa(i),
 							Type:      *otypes.TransactionType_VerificationTransaction.Enum(),
 						}
+
+						// Build some dataset.
 
 						transactionMessage.Data = &otypes.Transaction_VerificationData{
 							VerificationData: &otypes.VerificationTransactionData{
@@ -153,6 +232,8 @@ func (inst *Instance) Start(ctx context.Context) {
 								Attestation: "",
 								// XXX: Need to decide how we're building the cids.
 								// There's a tradeoff between blockchain size and download speed.
+								// Make a fake but plausible CID
+								// - It's currently a CID per byte.
 								Cid:        s.DataHashes[0].String(),
 								Datasource: r.Source.Name + "-" + r.Source.Topics[r.Topic],
 								// XXX: Should this be the time it started being recorded or ended?
@@ -170,19 +251,21 @@ func (inst *Instance) Start(ctx context.Context) {
 						env, err := inst.BftNode.ConfigureRPC()
 
 						if err != nil {
+							fmt.Println(transaction)
 							panic(err)
 						}
 
-						log.Debug("Pushing transaction with hash: ", sha256.Sum256(transactionBytes))
 						_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
 
 						if err != nil {
-							panic(err)
+							log.Error("Couldn't push transaction, reason: ", err)
+							// panic(err)
+						} else {
+							transactionPushedCount++
 						}
-						log.Debug("Succesfully pushed transaction!")
-
-						log.Debug("Got summary: ", s)
 					}
+
+					log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
 				}
 			}
 		}

@@ -1,0 +1,106 @@
+version: '3'
+services:
+  core-bootstrap-validator:
+    image: openmesh-core-testnet:latest
+    deploy:
+      replicas: 1
+    ports:
+      - "26656"
+      - "26657"
+      - "26658"
+    volumes:
+      - ./config:/core/conf
+    networks:
+      network1:
+        ipv4_address: 192.168.20.250
+    entrypoint: [ 'sh', '/core/bootstrap-entrypoint.sh' ]
+  core-seeder-validator-1:
+    image: openmesh-core-testnet:latest
+    ports:
+      - "26656"
+      - "26657"
+      - "26658"
+    volumes:
+      - ./config:/core/conf
+    networks:
+      network1:
+        ipv4_address: 192.168.20.251
+    entrypoint: [ 'sh', '/core/seeder-entrypoint.sh' ]
+    environment:
+      - COMET_NODE_KEY={"priv_key":{"type":"tendermint/PrivKeyEd25519","value":"jXw09/JU2OWbjkDH4P9hNFvnfZkpKo3YP5aetwXvYvaPx8dEM3k+7uT2ltfO2Dc95zF/47XPLABg9ZnygtuNoA=="}}
+  core-seeder-validator-2:
+    image: openmesh-core-testnet:latest
+    ports:
+      - "26656"
+      - "26657"
+      - "26658"
+    volumes:
+      - ./config:/core/conf
+    networks:
+      network1:
+        ipv4_address: 192.168.20.252
+    entrypoint: [ 'sh', '/core/seeder-entrypoint.sh' ]
+    environment:
+      - COMET_NODE_KEY={"priv_key":{"type":"tendermint/PrivKeyEd25519","value":"hJY17oXfrlWc9K4JjTxygT26icaT+boRZGgMgNUQJ25JjlUjLJ/4ree/6l8OktS6pwxnAdgv2qKjz6ACWXT0GA=="}}
+  core-seeder-validator-3:
+    image: openmesh-core-testnet:latest
+    ports:
+      - "26656"
+      - "26657"
+      - "26658"
+    volumes:
+      - ./config:/core/conf
+    networks:
+      network1:
+        ipv4_address: 192.168.20.253
+    entrypoint: [ 'sh', '/core/seeder-entrypoint.sh' ]
+    environment:
+      - COMET_NODE_KEY={"priv_key":{"type":"tendermint/PrivKeyEd25519","value":"cTnPW2v+2JHlLKWob+f32K6037EY1ZlIqxi0LxPp1mZWIG74+t8+RGEstuVIeZ4aUAKhNaNIuO1xeaeTK7yuHw=="}}
+  core-seeder-validator-4:
+    image: openmesh-core-testnet:latest
+    ports:
+      - "26656"
+      - "26657"
+      - "26658"
+    volumes:
+      - ./config:/core/conf
+    networks:
+      network1:
+        ipv4_address: 192.168.20.254
+    entrypoint: [ 'sh', '/core/seeder-entrypoint.sh' ]
+    environment:
+      - COMET_NODE_KEY={"priv_key":{"type":"tendermint/PrivKeyEd25519","value":"+/E66Lt7ndAUTMK5sAmn2RsCh13qTRuSHWmxYzvaaETGBHpYNJeqQrX1sy+doArww0dQx50PapKqkKNOd/htDg=="}}
+  core-seeder-validator-5:
+    image: openmesh-core-testnet:latest
+    ports:
+      - "26656"
+      - "26657"
+      - "26658"
+    volumes:
+      - ./config:/core/conf
+    networks:
+      network1:
+        ipv4_address: 192.168.21.1
+    entrypoint: [ 'sh', '/core/seeder-entrypoint.sh' ]
+    environment:
+      - COMET_NODE_KEY={"priv_key":{"type":"tendermint/PrivKeyEd25519","value":"nGhrh0hhesnhrwnLTe00SdGU2RDW6Z2WNJqvi9GDmEz7orBnTey06RE3mt8Fhl8dHMaS5XUX1OhD5Tz7SFE4mA=="}}
+  core-validator:
+    image: openmesh-core-testnet:latest
+    deploy:
+      replicas: 5
+    ports:
+      - "26656"
+      - "26657"
+      - "26658"
+    volumes:
+      - ./config:/core/conf
+    networks:
+    - network1
+    entrypoint: [ 'sh', '/core/entrypoint.sh' ]
+networks:
+  network1:
+    driver: bridge
+    ipam: 
+      driver: default
+      config:
+        - subnet: "192.168.0.0/18"

@@ -9,7 +9,6 @@
 *.dylib
 
 openmesh-core
-core
 
 # Test binary, built with `go test -c`
 *.test
@@ -31,17 +30,12 @@ go.work
 
 # Secrets & blockchain data
 /collector/.env
-cbft-home/data
-cbft-home/config/node_key.json
-cbft-home/config/priv_validator_key.json
-cbft-home/config/addrbook.json
-cbft-home/config/genesis.json
-
 
 # Arbitrary trashes
 .DS_Store
 executable-file
 /ignore
+/collector/.env
 log.txt
 
 # Default cometbft state (config.toml is important)
@@ -50,6 +44,18 @@ log.txt
 /default-cometbft-home/config/node_key.json
 /default-cometbft-home/config/priv_validator_key.json
 
+# Default cometbft state (config.toml is important)
+/default-cometbft-home/data
+/default-cometbft-home/config/addrbook.json
+/default-cometbft-home/config/node_key.json
+/default-cometbft-home/config/priv_validator_key.json
+
+# Default cometbft state (config.toml is important)
+/default-cometbft-home/data
+/default-cometbft-home/config/node_key.json
+/default-cometbft-home/config/priv_validator_key.json
 # Get rid of logs
 logs
-Test
+
+# Get rid of cbft-data
+/cbft-home
