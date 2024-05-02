@@ -209,7 +209,7 @@ func (inst *Instance) Start(ctx context.Context) {
 						if config.Config.BFT.MockTransactions {
 							// Mock transactions of a similar format.
 						} else {
-							summaries = inst.collector.SubmitRequests(requests)
+							summaries = inst.collector.SubmitRequests(requests, requestsNext, time.Now().Add(- time.Second))
 						}
 					} else {
 						log.Debug("No requests this block :(")
