@@ -161,38 +161,38 @@ func (inst *Instance) Start(ctx context.Context) {
 						if validatorSet.HasAddress(addr) {
 							log.Info("Turns out we're registered!")
 							registered = true
-						}
-
-						if !registerSentTransaction {
-							transactionMessage := otypes.Transaction{
-								Owner:     base64AddrString,
-								Signature: "",
-								Type:      *otypes.TransactionType_NodeRegistrationTransaction.Enum(),
-								Data: &otypes.Transaction_NodeRegistrationData{
-									NodeRegistrationData: &otypes.NodeRegistrationTransactionData{
-										NodeAddress:     base64AddrString,
-										NodeAttestation: "",
-										NodeSignature:   "",
+						} else {
+							if !registerSentTransaction {
+								transactionMessage := otypes.Transaction{
+									Owner:     base64AddrString,
+									Signature: "",
+									Type:      *otypes.TransactionType_NodeRegistrationTransaction.Enum(),
+									Data: &otypes.Transaction_NodeRegistrationData{
+										NodeRegistrationData: &otypes.NodeRegistrationTransactionData{
+											NodeAddress:     base64AddrString,
+											NodeAttestation: "",
+											NodeSignature:   "",
+										},
 									},
-								},
-							}
+								}
 
-							transactionBytes, err := proto.Marshal(&transactionMessage)
-							if err != nil {
-								panic(err)
-							}
+								transactionBytes, err := proto.Marshal(&transactionMessage)
+								if err != nil {
+									panic(err)
+								}
 
-							transaction := types.Tx(transactionBytes[:])
+								transaction := types.Tx(transactionBytes[:])
 
-							log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
-							_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
+								log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
+								_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
 
-							if err != nil {
-								log.Error("Failed to push registration transaction: ", err)
-								// panic(err)
-							} else {
-								log.Debug("Succesfully pushed registration transaction!")
-								registerSentTransaction = true
+								if err != nil {
+									log.Error("Failed to push registration transaction: ", err)
+									// panic(err)
+								} else {
+									log.Debug("Succesfully pushed registration transaction!")
+									registerSentTransaction = true
+								}
 							}
 						}
 					}
@@ -209,7 +209,7 @@ func (inst *Instance) Start(ctx context.Context) {
 						if config.Config.BFT.MockTransactions {
 							// Mock transactions of a similar format.
 						} else {
-							summaries = inst.collector.SubmitRequests(requests, requestsNext, time.Now().Add(- time.Second))
+							summaries = inst.collector.SubmitRequests(requests, requestsNext, time.Now().Add(-time.Second))
 						}
 					} else {
 						log.Debug("No requests this block :(")
