@@ -63,16 +63,19 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 		if err != nil {
 			log.Error("Error unmarshaling transaction data:", err)
 		}
+
 		switch transaction.Type {
 		case types.TransactionType_VerificationTransaction:
 			result = append(result, slice...)
 
+		case types.TransactionType_SummaryTransaction:
+			log.Debug("We are removing this TX")
 		default:
 			othertx = append(othertx, slice)
 		}
 
 	}
-	log.Error("Merging Done")
+	log.Debug("Merging Done")
 
 	hash := sha256.Sum256(result)
 	hashString := base64.StdEncoding.EncodeToString(hash[:])
@@ -91,7 +94,7 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 	if err != nil {
 		panic(err)
 	}
-	log.Error("Marshaling Done")
+	log.Debug("Marshaling Done")
 	transactions := comettype.Tx(transactionBytes[:])
 	proposal.Txs = append(othertx, transactions)
 
@@ -109,7 +112,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 			return string(app.CurrentMempool[i]) < string(app.CurrentMempool[j])
 		})
 	}
-	log.Error("Sorting Done")
+	log.Debug("Sorting Done")
 	var result []byte
 	var othertx = [][]byte{}
 	for _, slice := range app.CurrentMempool {
@@ -128,7 +131,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 
 	}
 
-	log.Error("Merging Done")
+	log.Debug("Merging Done")
 	hash := sha256.Sum256(result)
 	hashString := base64.StdEncoding.EncodeToString(hash[:])
 
@@ -168,7 +171,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 			}
 		}
 	}
-	log.Error("Signing Done")
+	log.Debug("Signing Done")
 
 	return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_ACCEPT}, nil
 }
@@ -455,7 +458,7 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 			return 1
 		}
 		if verificationData.GetHeight() <= app.Currblockno {
-			log.Error("the transaction will be rejected due to blockheigh", app.Currblockno, verificationData.GetHeight())
+			log.Debug("the transaction will be rejected due to blockheigh", app.Currblockno, verificationData.GetHeight())
 			return 1
 
 		}
