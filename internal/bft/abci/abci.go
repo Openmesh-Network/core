@@ -105,7 +105,8 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 	// Supposedly it's bad for performance to reject crappy blocks.
 	// I think we should be a strict as possible, and give death penalty to misbehaving nodes basically.
 	total_tx := app.Node.Mempool().ReapMaxTxs(-1)
-
+	log.Debug("The size for the node is")
+	log.Debug(app.Node.Mempool().Size())
 	app.CurrentMempool = total_tx
 	if len(app.CurrentMempool) > 2 {
 		sort.Slice(app.CurrentMempool, func(i, j int) bool {
