@@ -458,7 +458,7 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 			log.Error("Error unmarshaling verification data", err)
 			return 1
 		}
-		if verificationData.GetHeight() <= app.Currblockno {
+		if verificationData.GetHeight() == app.Currblockno {
 			log.Debug("the transaction will be rejected due to blockheigh", app.Currblockno, verificationData.GetHeight())
 			return 1
 

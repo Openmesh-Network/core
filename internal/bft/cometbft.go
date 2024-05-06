@@ -223,7 +223,7 @@ func (inst *Instance) Start(ctx context.Context) {
 								Datasource: "examplesource" + "-" + "exampletopic",
 								// XXX: Should this be the time it started being recorded or ended?
 								Timestamp: time.Now().Unix(),
-								Height:    res.SyncInfo.LatestBlockHeight + 1,
+								Height:    res.SyncInfo.LatestBlockHeight + 2,
 							},
 						}
 
