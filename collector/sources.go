@@ -122,7 +122,6 @@ func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []by
 
 	request := strings.Replace(source.Request, "{{topic}}", topic, 1)
 
-	fmt.Println(request)
 	ws.Write(ctx, websocket.MessageText, []byte(request))
 
 	msgChannel := make(chan []byte)
@@ -216,10 +215,10 @@ func ankrJoinRPC(ctx context.Context, source Source, topic string) (chan []byte,
 				// actually error on the state of the request, not the parent's context.
 				ctxToPreventHanging, cancel := context.WithTimeout(context.Background(), time.Second*2)
 				defer cancel()
-				fmt.Println("Waiting for block...")
+				// fmt.Println("Waiting for block...")
 				block, err := ethereum_client.BlockByNumber(ctxToPreventHanging, nil)
-				bnumber := block.Number()
-				fmt.Printf("Got block %s!\n", bnumber)
+				// bnumber := block.Number()
+				// fmt.Printf("Got block %s!\n", bnumber)
 
 				if err != nil {
 					errChannel <- err
