@@ -9,6 +9,7 @@ import (
 	nm "github.com/cometbft/cometbft/node"
 	comettype "github.com/cometbft/cometbft/types"
 	"github.com/dgraph-io/badger/v3"
+	help "github.com/openmesh-network/core/internal/bft/helper"
 	"google.golang.org/protobuf/proto"
 
 	// "math/rand"
@@ -49,13 +50,9 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 
 	// Will currently accept all transactions.
 
-	var result []byte
+	var result [][]byte
 	var othertx = [][]byte{}
-	if len(proposal.Txs) > 2 {
-		sort.Slice(proposal.Txs, func(i, j int) bool {
-			return string(proposal.Txs[i]) < string(proposal.Txs[j])
-		})
-	}
+
 	log.Error("Sorting Done")
 	for _, slice := range proposal.Txs {
 		var transaction types.Transaction
@@ -66,7 +63,7 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 
 		switch transaction.Type {
 		case types.TransactionType_VerificationTransaction:
-			result = append(result, slice...)
+			result = append(result, slice)
 
 		case types.TransactionType_SummaryTransaction:
 			log.Debug("We are removing this TX")
@@ -75,9 +72,12 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 		}
 
 	}
+
+	var xoredTx = help.XorArrays(result)
+
 	log.Debug("Merging Done")
 
-	hash := sha256.Sum256(result)
+	hash := sha256.Sum256(xoredTx)
 	hashString := base64.StdEncoding.EncodeToString(hash[:])
 	transactionMessage := types.Transaction{
 		Owner:     "trial",
@@ -114,7 +114,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 		})
 	}
 	log.Debug("Sorting Done")
-	var result []byte
+	var result [][]byte
 	var othertx = [][]byte{}
 	for _, slice := range app.CurrentMempool {
 		var transaction types.Transaction
@@ -124,7 +124,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 		}
 		switch transaction.Type {
 		case types.TransactionType_VerificationTransaction:
-			result = append(result, slice...)
+			result = append(result, slice)
 
 		default:
 			othertx = append(othertx, slice)
@@ -132,8 +132,11 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 
 	}
 
+	var xoredTx = help.XorArrays(result)
+
 	log.Debug("Merging Done")
-	hash := sha256.Sum256(result)
+
+	hash := sha256.Sum256(xoredTx)
 	hashString := base64.StdEncoding.EncodeToString(hash[:])
 
 	for _, tx := range proposal.Txs {
