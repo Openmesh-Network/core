@@ -122,7 +122,7 @@ func (inst *Instance) Start(ctx context.Context) {
 
 	registered := false
 	registerSentTransaction := false
-
+	latestblockheight := -1
 	// Event handler
 	go func() {
 		for {
@@ -199,59 +199,63 @@ func (inst *Instance) Start(ctx context.Context) {
 					}
 				} else {
 					res, err := env.Status(&rpctypes.Context{})
-					if err != nil {
-						panic(err)
-					}
-					transactionPushedCount := 0
-					for i := 0; i < collector.WORKER_COUNT; i++ {
-						// Format as a transactionMessage
-						transactionMessage := otypes.Transaction{
-							Owner:     base64AddrString,
-							Signature: "",
-							Type:      *otypes.TransactionType_VerificationTransaction.Enum(),
-						}
+					if int(res.SyncInfo.LatestBlockHeight) <= latestblockheight {
 
-						// Build some dataset.
-						transactionMessage.Data = &otypes.Transaction_VerificationData{
-							VerificationData: &otypes.VerificationTransactionData{
-								// XXX: Actually provide attestation here.
-								Attestation: "",
-								// XXX: Need to decide how we're building the cids.
-								// There's a tradeoff between blockchain size and download speed.
-								// Make a fake but plausible CID
-								Cid:        base64.StdEncoding.EncodeToString(rand.Bytes(40)),
-								Datasource: "examplesource" + "-" + "exampletopic",
-								// XXX: Should this be the time it started being recorded or ended?
-								Timestamp: time.Now().Unix(),
-								Height:    res.SyncInfo.LatestBlockHeight + 2,
-							},
-						}
-
-						transactionBytes, err := proto.Marshal(&transactionMessage)
 						if err != nil {
 							panic(err)
 						}
+						transactionPushedCount := 0
+						for i := 0; i < collector.WORKER_COUNT; i++ {
+							// Format as a transactionMessage
+							transactionMessage := otypes.Transaction{
+								Owner:     base64AddrString,
+								Signature: "",
+								Type:      *otypes.TransactionType_VerificationTransaction.Enum(),
+							}
 
-						transaction := types.Tx(transactionBytes[:])
+							// Build some dataset.
+							transactionMessage.Data = &otypes.Transaction_VerificationData{
+								VerificationData: &otypes.VerificationTransactionData{
+									// XXX: Actually provide attestation here.
+									Attestation: "",
+									// XXX: Need to decide how we're building the cids.
+									// There's a tradeoff between blockchain size and download speed.
+									// Make a fake but plausible CID
+									Cid:        base64.StdEncoding.EncodeToString(rand.Bytes(40)),
+									Datasource: "examplesource" + "-" + "exampletopic",
+									// XXX: Should this be the time it started being recorded or ended?
+									Timestamp: time.Now().Unix(),
+									Height:    res.SyncInfo.LatestBlockHeight + 2,
+								},
+							}
 
-						env, err := inst.BftNode.ConfigureRPC()
+							transactionBytes, err := proto.Marshal(&transactionMessage)
+							if err != nil {
+								panic(err)
+							}
 
-						if err != nil {
-							fmt.Println(transaction)
-							panic(err)
+							transaction := types.Tx(transactionBytes[:])
+
+							env, err := inst.BftNode.ConfigureRPC()
+
+							if err != nil {
+								fmt.Println(transaction)
+								panic(err)
+							}
+
+							_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
+
+							if err != nil {
+								log.Error("Couldn't push transaction, reason: ", err)
+								// panic(err)
+							} else {
+								transactionPushedCount++
+							}
 						}
 
-						_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
-
-						if err != nil {
-							log.Error("Couldn't push transaction, reason: ", err)
-							// panic(err)
-						} else {
-							transactionPushedCount++
-						}
+						log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
+						latestblockheight = int(res.SyncInfo.LatestBlockHeight)
 					}
-
-					log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
 				}
 			}
 		}
