@@ -199,7 +199,7 @@ func (inst *Instance) Start(ctx context.Context) {
 					}
 				} else {
 					res, err := env.Status(&rpctypes.Context{})
-					if int(res.SyncInfo.LatestBlockHeight) <= latestblockheight {
+					if int(res.SyncInfo.LatestBlockHeight) >= latestblockheight {
 
 						if err != nil {
 							panic(err)
