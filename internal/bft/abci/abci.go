@@ -465,10 +465,7 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 		}
 
 		return 0
-		// verificationData := &types.VerificationTransactionData{}
-		// verificationData = transaction.GetVerificationData()
-		// log.Info("Verification Transaction Data:", verificationData)
-		return 0
+
 	case types.TransactionType_ResourceTransaction:
 		// resourceData := &types.ResourceTransactionData{}
 		// resourceData = transaction.GetResourceData()
