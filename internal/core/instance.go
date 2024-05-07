@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/openmesh-network/core/internal/bft"
+	"github.com/openmesh-network/core/internal/config"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/networking/p2p"
@@ -41,6 +42,10 @@ func (i *Instance) Start(ctx context.Context) {
 	err := i.pi.Start()
 	if err != nil {
 		logger.Fatalf("Failed to start p2p instance: %s", err.Error())
+	}
+
+	if config.Config.P2P.DebugAutoconnectMultiaddr != "" {
+		i.pi.ConnectFromMultiaddr(ctx, config.Config.P2P.DebugAutoconnectMultiaddr)
 	}
 
 	i.BFT.Start(ctx)

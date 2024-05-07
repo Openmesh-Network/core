@@ -5,6 +5,7 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	log "github.com/openmesh-network/core/internal/logger"
 )
 
 // Keeps track of Cids in data.
@@ -49,6 +50,8 @@ func (s *Stream) Flush() {
 			if err != nil {
 				panic(err)
 			}
+
+			log.Debug("Got cid: ", c)
 		}
 
 		s.cidHashes = append(s.cidHashes, c)

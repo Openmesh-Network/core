@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/openmesh-network/core/internal/config"
+	log "github.com/openmesh-network/core/internal/logger"
 )
 
 // Instance is the libp2p instance for networking usage.
@@ -94,8 +94,8 @@ func (i *Instance) Build() (*Instance, error) {
 		log.Fatalf("Failed to create Gossip pub-sub service: %s", err.Error())
 	}
 
-	log.Printf("Successfully initialised a libp2p instance with ID %s", (*i.Host).ID())
-	log.Printf("Multiaddr is: %s\n", HostToString(*i.Host))
+	log.Info("Successfully initialised a libp2p instance with ID %s", (*i.Host).ID())
+	log.Info("Multiaddr is: %s\n", HostToString(*i.Host))
 	return i, nil
 }
 
@@ -189,7 +189,7 @@ func (i *Instance) waitMsg(handle *pubsub.Subscription, ch chan<- *pubsub.Messag
 	for {
 		msg, err := handle.Next(i.cancelCtx)
 		if err != nil {
-			log.Printf("Failed to receve message: %s", err.Error())
+			log.Info("Failed to receve message: %s", err.Error())
 			continue
 		}
 
@@ -212,7 +212,7 @@ func (i *Instance) connectToNewPeer(ctx context.Context) {
 
 			// Don't connect to new peers if peer limit exceeded
 			if i.nbOfPeers >= i.thisconfig.PeerLimit {
-				log.Printf(
+				log.Warn(
 					"Peer limit %d exceeded, ignore newly discovered peer %s",
 					i.thisconfig.PeerLimit,
 					p.ID,
@@ -225,13 +225,13 @@ func (i *Instance) connectToNewPeer(ctx context.Context) {
 			i.peersLock.Unlock()
 			err := (*i.Host).Connect(context.Background(), p)
 			if err != nil {
-				log.Printf("Failed to connect to peer %s: %s", p.ID, err.Error())
-				log.Printf("Start retry to connect to peer...")
+				log.Warn("Failed to connect to peer %s: %s", p.ID, err.Error())
+				log.Warn("Start retry to connect to peer...")
 				go i.tryConnect(10, p)
 				continue
 			}
 			i.increaseNbOfPeers()
-			log.Printf("Successfully establised connection to peer %s", p.ID)
+			log.Info("Successfully establised connection to peer %s", p.ID)
 			continue
 		case <-ctx.Done():
 			return
@@ -247,16 +247,16 @@ func (i *Instance) tryConnect(cnt int, p peer.AddrInfo) {
 		case <-t.C:
 			err := (*i.Host).Connect(context.Background(), p)
 			if err != nil {
-				log.Printf("Failed to connect to peer %s: %s, retry after 5 seconds...", p.ID, err.Error())
+				log.Warn("Failed to connect to peer %s: %s, retry after 5 seconds...", p.ID, err.Error())
 				continue
 			}
 
 			i.increaseNbOfPeers()
-			log.Printf("Successfully establised connection to peer %s", p.ID)
+			log.Info("Successfully establised connection to peer %s", p.ID)
 			return
 		}
 	}
-	log.Printf("Retry limit exceeded, will not continue trying to connect to peer %s", p.ID)
+	log.Warn("Retry limit exceeded, will not continue trying to connect to peer %s", p.ID)
 }
 
 // increaseNbOfPeers is a synchronisation-safe operation that increase number of peers in the instance by 1
@@ -265,7 +265,7 @@ func (i *Instance) increaseNbOfPeers() {
 	defer i.peersLock.Unlock()
 
 	i.nbOfPeers++
-	log.Printf("Number of peers discovered and connected to: %d", i.nbOfPeers)
+	log.Info("Number of peers discovered and connected to: %d", i.nbOfPeers)
 }
 
 // NewDefaultP2PHost initialise a new libp2p host
@@ -297,4 +297,33 @@ func NewDefaultP2PHost() (*host.Host, error) {
 	}
 
 	return &h, nil
+}
+
+func (i *Instance) ConnectFromMultiaddr(ctx context.Context, str string) {
+	maddr, _ := multiaddr.NewMultiaddr(str)
+	info, err := peer.AddrInfoFromP2pAddr(maddr)
+	if err != nil {
+		log.Error("Error getting info ", err.Error())
+		return
+	}
+
+	t := time.NewTicker(time.Millisecond * 100)
+	v := false
+	for !v {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if i.Host != nil {
+				v = true
+			}
+		}
+	}
+
+	err = (*i.Host).Connect(ctx, *info)
+	if err == nil {
+		log.Info("Connected to address")
+	} else {
+		log.Error("Error connecting to ", str, err.Error())
+	}
 }

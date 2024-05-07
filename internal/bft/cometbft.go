@@ -50,7 +50,7 @@ func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instan
 
 	// Parse CometBFT config
 	bftConf := viper.New()
-	// TODO XXX: embed this into the executable instead of loading it from filesystem.
+	// TODO XXX: Embed this into the executable instead of loading it from filesystem.
 	bftConf.SetConfigFile(fmt.Sprintf("%s/%s", homeDir, "config/config.toml"))
 	if err := bftConf.ReadInConfig(); err != nil {
 		return nil, err
@@ -95,9 +95,6 @@ func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instan
 		nm.DefaultMetricsProvider(conf.Instrumentation),
 		log,
 	)
-
-	// events := node.EventBus()
-	// data := types.EventDataTx{}
 
 	if err != nil {
 		return nil, err
@@ -232,7 +229,7 @@ func (inst *Instance) Start(ctx context.Context) {
 
 						transactionMessage.Data = &otypes.Transaction_VerificationData{
 							VerificationData: &otypes.VerificationTransactionData{
-								// XXX: Actually provide attestation here.
+								// XXX: Decide how we're handling attestations.
 								Attestation: "",
 								// XXX: Need to decide how we're building the cids.
 								// There's a tradeoff between blockchain size and download speed.
@@ -269,7 +266,7 @@ func (inst *Instance) Start(ctx context.Context) {
 						}
 					}
 
-					log.Debug("Pushed ", transactionPushedCount, "/", collector.WORKER_COUNT)
+					log.Debug("Pushed ", transactionPushedCount, "/", len(summaries))
 				}
 			}
 		}
