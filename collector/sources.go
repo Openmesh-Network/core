@@ -129,10 +129,20 @@ func parseCEX(source Source, data []byte) []byte {
 	} else {
 		switch source.Name {
 		case "binance":
+			// TODO: Replace this with actual parsing.
+			return data
 		case "coinbase":
+			// TODO: Replace this with actual parsing.
+			return data
 		case "dydx":
+			// TODO: Replace this with actual parsing.
+			return data
 		case "bybit":
+			// TODO: Replace this with actual parsing.
+			return data
 		case "okx":
+			// TODO: Replace this with actual parsing.
+			return data
 		default:
 			// TODO: Add a test that checks for this specific behaviour!
 			panic("Source from SourcesCEX not handled!")

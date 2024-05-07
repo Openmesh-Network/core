@@ -3,13 +3,13 @@ package collector
 var SourcesCEX = []Source{
 	// Centralised Exchanges:
 	// Note that the topics are incomplete as they are undecided.
-	{"binance", defaultJoinCEX, nil, "wss://stream.binance.com:9443/ws", []string{"btcusdt", "ethusdt", "solusdt"}, "{ \"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1 }"},
-	{"coinbase", defaultJoinCEX, nil, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"},
+	{"binance", defaultJoinCEX, panicStubFunctionSeeBodyForExplanation, "wss://stream.binance.com:9443/ws", []string{"btcusdt", "ethusdt", "solusdt"}, "{ \"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1 }"},
+	{"coinbase", defaultJoinCEX, panicStubFunctionSeeBodyForExplanation, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"},
 
 	{
 		"dydx",
 		defaultJoinCEX,
-		nil,
+		panicStubFunctionSeeBodyForExplanation,
 		"wss://api.dydx.exchange/v3/ws",
 		[]string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"},
 		"{\"type\": \"subscribe\", \"id\": \"{{topic}}\", \"channel\": \"v3_trades\"}",
@@ -17,7 +17,7 @@ var SourcesCEX = []Source{
 	{
 		"bybit",
 		defaultJoinCEX,
-		nil,
+		panicStubFunctionSeeBodyForExplanation,
 		"wss://stream.bybit.com/v5/public/spot",
 		[]string{"orderbook.50.BTCUSDT", "publicTrade.BTCUSDT", "tickers.BTCUSDT", "kline.M.BTCUSDT"},
 		`{"op": "subscribe","args": ["{{topic}}"]}`,
@@ -28,7 +28,7 @@ var SourcesCEX = []Source{
 	{
 		"okx",
 		defaultJoinCEX,
-		nil,
+		panicStubFunctionSeeBodyForExplanation,
 		"wss://ws.okx.com:8443/ws/v5/business",
 		[]string{"sprd-bbo-tbt", "sprd-books5", "sprd-public-trades", "sprd-tickers"},
 		`{"op": "subscribe","args": [{"channel": "{{topic}}","sprdId": "BTC-USDT_BTC-USDT-SWAP"}]}`,
@@ -55,4 +55,8 @@ func init() {
 	for i := range SourcesCEX {
 		SourcesCEX[i].ParseFunc = parseCEX
 	}
+}
+
+func panicStubFunctionSeeBodyForExplanation(source Source, data []byte) []byte {
+	panic("This function should never run, it's here to avoid an initialization cycle for the parseCEX function.\n The actual function used by CEXs is set on the init function in the sourcedefinitions.go file.")
 }

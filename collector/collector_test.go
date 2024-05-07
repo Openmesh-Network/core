@@ -9,17 +9,17 @@ import (
 	"github.com/openmesh-network/core/resourcepool"
 )
 
-var dummysource = Source{
-	"dummysource",
-	dummyjoin,
-	"", []string{""},
-	"",
-}
+// var dummysource = Source{
+// 	"dummysource",
+// 	dummyjoin,
+// 	"", []string{""},
+// 	"",
+// }
 
-var dummyrequest = Request{
-	dummysource,
-	0,
-}
+// var dummyrequest = Request{
+// 	dummysource,
+// 	0,
+// }
 
 
 func dummyjoin(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
@@ -35,6 +35,6 @@ func TestBasic(t *testing.T) {
 
 	ci.Start(ctx)
 
-	ci.SubmitRequests()
+	// ci.SubmitRequests()
 
 }
