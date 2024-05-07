@@ -7,7 +7,7 @@ require (
 	github.com/Jeffail/gabs v1.4.0
 	github.com/cometbft/cometbft v0.38.6
 	github.com/dgraph-io/badger/v3 v3.2103.5
-	github.com/ethereum/go-ethereum v1.13.14
+	github.com/ethereum/go-ethereum v1.13.15
 	github.com/ipfs/boxo v0.19.0
 	github.com/ipfs/go-block-format v0.2.0
 	github.com/ipfs/go-cid v0.4.1
