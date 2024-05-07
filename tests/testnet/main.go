@@ -16,6 +16,7 @@ import (
 const DEFAULT_NODE_COUNT = 5
 const DIR_BASE = "/tmp/cbfttest"
 const INCREMENT_IPS = false
+const IPFS_AUTOCONNECT_MULTIADDR = "" // Multiaddress to automatically connect new nodes to you can do `ipfs id` to find the multiaddress of your kubo daemon.
 
 // Won't necessarily be compatible with OS ipv4.
 // Made to work internally only.
@@ -347,6 +348,7 @@ p2p:
   port: 0
   groupName: xnode
   peerLimit: 50
+  debugAutoconnectMultiaddr: "{{ ipfs-autoconnect-multiaddr }}"
 bft:
   homeDir: {{ bft-home-dir }}
 db:
@@ -380,6 +382,7 @@ nft:
 
 	fixedYaml := strings.Clone(yaml)
 	fixedYaml = strings.ReplaceAll(fixedYaml, "{{ bft-home-dir }}", absoluteDirectory+"/cbft")
+	fixedYaml = strings.ReplaceAll(fixedYaml, "{{ ipfs-autoconnect-multiaddr }}", IPFS_AUTOCONNECT_MULTIADDR)
 
 	os.WriteFile(absoluteDirectory+"/config.yaml", []byte(fixedYaml), 0o777)
 }

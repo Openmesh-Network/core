@@ -300,6 +300,7 @@ func NewDefaultP2PHost() (*host.Host, error) {
 }
 
 func (i *Instance) ConnectFromMultiaddr(ctx context.Context, str string) {
+	log.Debug("Trying to connect to multiaddr...")
 	maddr, _ := multiaddr.NewMultiaddr(str)
 	info, err := peer.AddrInfoFromP2pAddr(maddr)
 	if err != nil {
@@ -320,9 +321,10 @@ func (i *Instance) ConnectFromMultiaddr(ctx context.Context, str string) {
 		}
 	}
 
+	log.Debug("Connecting to multiaddr...")
 	err = (*i.Host).Connect(ctx, *info)
 	if err == nil {
-		log.Info("Connected to address")
+		log.Info("Connected to the multiaddr successfully!")
 	} else {
 		log.Error("Error connecting to ", str, err.Error())
 	}
