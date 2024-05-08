@@ -60,8 +60,8 @@ var Sources = [...]Source{
 	// Add Uniswap
 
 	// Blockchain RPCs:
-	{"ethereum-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/eth", []string{""}, ""},
-	{"polygon-ankr-rpc", ankrJoinRPC, "https://rpc.ankr.com/polygon", []string{""}, ""},
+	{"ethereum-ankr-rpc", joinEthereumRPC, "https://rpc.ankr.com/eth", []string{""}, ""}, // Ankr by default; To-do: Add to configuration.yml
+	{"polygon-ankr-rpc", joinEthereumRPC, "https://rpc.ankr.com/polygon", []string{""}, ""},
 
 	// XXX: Disabled for now since it requires an API key. We can't guarantee nodes in the actual network will have this key.
 	// Centralised NFT Exchange:
@@ -189,7 +189,7 @@ func okxJoinCEX(ctx context.Context, source Source, topic string) (chan []byte, 
 	return msgChannel, errChannel, nil
 }
 
-func ankrJoinRPC(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
+func joinEthereumRPC(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
 	ethereum_client, err := ethclient.Dial(source.ApiURL)
 	if err != nil {
 		return nil, nil, err
