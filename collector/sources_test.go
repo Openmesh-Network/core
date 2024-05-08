@@ -38,6 +38,12 @@ func TestSourcesTableSanity(t *testing.T) {
 	}
 }
 
+func TestAllCEXAreParsed(t *testing.T) {
+	for i := range SourcesCEX {
+		SourcesCEX[i].ParseFunc(SourcesCEX[i], nil)
+	}
+}
+
 func TestBinanceJoin(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

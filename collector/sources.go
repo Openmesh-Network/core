@@ -22,52 +22,12 @@ import (
 // Defines a "source" of data, all supported sources are laid out in the Sources array.
 // We opt for this approach over oop for clarity and extensibility.
 type Source struct {
-	Name     string
-	JoinFunc func(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error)
-	ApiURL   string // To-do: Add support for multiple endpoints.
-	Topics   []string
-	Request  string
-}
-
-// The master table with all our sources.
-var Sources = [...]Source{
-	// Centralised Exchanges:
-	// Note that the topics are incomplete as they are undecided.
-	{"binance", defaultJoinCEX, "wss://stream.binance.com:9443/ws", []string{"btcusdt", "ethusdt", "solusdt"}, "{ \"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1 }"},
-	{"coinbase", defaultJoinCEX, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"},
-	{"dydx", defaultJoinCEX, "wss://api.dydx.exchange/v3/ws", []string{"MATIC-USD", "LINK-USD", "SOL-USD", "ETH-USD", "BTC-USD"}, "{\"type\": \"subscribe\", \"id\": \"{{topic}}\", \"channel\": \"v3_trades\"}"},
-
-	// Bybit
-	{
-		"bybit",
-		defaultJoinCEX,
-		"wss://stream.bybit.com/v5/public/spot",
-		[]string{"orderbook.50.BTCUSDT", "publicTrade.BTCUSDT", "tickers.BTCUSDT", "kline.M.BTCUSDT"},
-		`{"op": "subscribe","args": ["{{topic}}"]}`,
-	},
-
-	// OKX
-	// https://www.okx.com/docs-v5/en/#spread-trading-websocket-public-channel
-	{
-		"okx",
-		defaultJoinCEX,
-		"wss://ws.okx.com:8443/ws/v5/business",
-		[]string{"sprd-bbo-tbt", "sprd-books5", "sprd-public-trades", "sprd-tickers"},
-		`{"op": "subscribe","args": [{"channel": "{{topic}}","sprdId": "BTC-USDT_BTC-USDT-SWAP"}]}`,
-	},
-
-	// Decentralised Exchanges
-	// Add Uniswap
-
-	// Blockchain RPCs:
-	{"ethereum-ankr-rpc", joinEthereumRPC, "https://rpc.ankr.com/eth", []string{""}, ""}, // Ankr by default; To-do: Add to configuration.yml
-	{"polygon-ankr-rpc", joinEthereumRPC, "https://rpc.ankr.com/polygon", []string{""}, ""},
-
-	// XXX: Disabled for now since it requires an API key. We can't guarantee nodes in the actual network will have this key.
-	// Centralised NFT Exchange:
-	// Opensea Request structure: {topic: \ event: \ payload:{} \ ref: }
-	// {"opensea", defaultJoinNFTCEX, "wss://stream.openseabeta.com/socket", []string{"item_listed", "item_cancelled", "item_sold", "item_transferred", "item_received_offer", "item_received_bid"}, "collections:*"},
-
+	Name      string
+	JoinFunc  func(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error)
+	ParseFunc func(source Source, data []byte) []byte
+	ApiURL    string // To-do: Add support for multiple endpoints.
+	Topics    []string
+	Request   string
 }
 
 // Subscribe will connect to the chosen source and create a channel which will return every message from it.
@@ -90,6 +50,10 @@ func Subscribe(ctx context.Context, source Source, topic string) (chan []byte, e
 		for {
 			select {
 			case msg := <-msgChannel:
+				if source.ParseFunc != nil {
+					msg = source.ParseFunc(source, msg)
+				}
+
 				select {
 				case outChannel <- msg:
 				case <-ctx.Done():
@@ -122,7 +86,6 @@ func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []by
 
 	request := strings.Replace(source.Request, "{{topic}}", topic, 1)
 
-	fmt.Println(request)
 	ws.Write(ctx, websocket.MessageText, []byte(request))
 
 	msgChannel := make(chan []byte)
@@ -147,6 +110,46 @@ func defaultJoinCEX(ctx context.Context, source Source, topic string) (chan []by
 		ws.CloseNow()
 	}()
 	return msgChannel, errChannel, nil
+}
+
+// Converts data from individual formats to CCTX!
+func parseCEX(source Source, data []byte) []byte {
+	// Check if this source exists in sources array.
+	// XXX: Possible optimization here?
+	exists := false
+	for _, s := range SourcesCEX {
+		if s.Name == source.Name {
+			exists = true
+			break
+		}
+	}
+
+	if !exists {
+		panic("Source called defaultParseCEX, but it's not a part of assignment.")
+	} else {
+		switch source.Name {
+		case "binance":
+			// TODO: Replace this with actual parsing.
+			return data
+		case "coinbase":
+			// TODO: Replace this with actual parsing.
+			return data
+		case "dydx":
+			// TODO: Replace this with actual parsing.
+			return data
+		case "bybit":
+			// TODO: Replace this with actual parsing.
+			return data
+		case "okx":
+			// TODO: Replace this with actual parsing.
+			return data
+		default:
+			// TODO: Add a test that checks for this specific behaviour!
+			panic("Source from SourcesCEX not handled!")
+		}
+	}
+
+	return nil
 }
 
 // OKS's WebSocket API requires websocket.MessageText (instead of websocket.Binary),
@@ -212,14 +215,12 @@ func joinEthereumRPC(ctx context.Context, source Source, topic string) (chan []b
 			case <-ctx.Done():
 				// Quit gracefully, out context was handled above.
 			case <-timeTicker:
-				// XXX: This might add 2 seconds to shutdown. It's unfortunate, but it guarantees error checks below
-				// actually error on the state of the request, not the parent's context.
-				ctxToPreventHanging, cancel := context.WithTimeout(context.Background(), time.Second*2)
+				ctxToPreventHanging, cancel := context.WithTimeout(ctx, time.Second*2)
 				defer cancel()
-				fmt.Println("Waiting for block...")
+				// fmt.Println("Waiting for block...")
 				block, err := ethereum_client.BlockByNumber(ctxToPreventHanging, nil)
-				bnumber := block.Number()
-				fmt.Printf("Got block %s!\n", bnumber)
+				// bnumber := block.Number()
+				// fmt.Printf("Got block %s!\n", bnumber)
 
 				if err != nil {
 					errChannel <- err
@@ -244,6 +245,7 @@ func joinEthereumRPC(ctx context.Context, source Source, topic string) (chan []b
 	return msgChannel, errChannel, nil
 }
 
+// TODO: Reconsider NFT marketplace in the future. API key requirement is too restrictive!
 func defaultJoinNFTCEX(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
 	// Get users api key.
 	apiKey := getVarFromEnv("OPENSEA_API_KEY") // Refactor for any NFT CEX later.

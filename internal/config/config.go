@@ -19,10 +19,11 @@ type config struct {
 }
 
 type P2pConfig struct {
-	Addr      string `yaml:"addr"`      // libp2p listening address (default: 0.0.0.0)
-	Port      int    `yaml:"port"`      // libp2p listening port
-	GroupName string `yaml:"groupName"` // Name used for discovering nodes via mDNS
-	PeerLimit int    `yaml:"peerLimit"` // Max number of peers this node can establish connection to
+	Addr                      string `yaml:"addr"`                      // libp2p listening address (default: 0.0.0.0)
+	Port                      int    `yaml:"port"`                      // libp2p listening port
+	GroupName                 string `yaml:"groupName"`                 // Name used for discovering nodes via mDNS
+	PeerLimit                 int    `yaml:"peerLimit"`                 // Max number of peers this node can establish connection to
+	DebugAutoconnectMultiaddr string `yaml:"debugAutoconnectMultiaddr"` // Multiaddr of node to automatically connect to.
 }
 
 // DBConfig is the configuration for database connection and operation
@@ -36,7 +37,7 @@ type DBConfig struct {
 
 // BFTConfig is the configuration for using CometBFT
 type BFTConfig struct {
-	HomeDir             string `yaml:"homeDir"`           // Path to CometBFT config
+	HomeDir             string `yaml:"homeDir"`             // Path to CometBFT config
 	MockTransactions    bool   `yaml:"mockTransactions"`    // Mock transacitons
 	SkipSourceSelection bool   `yaml:"skipSourceSelection"` // Source field selection
 }
