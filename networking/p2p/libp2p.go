@@ -189,7 +189,7 @@ func (i *Instance) waitMsg(handle *pubsub.Subscription, ch chan<- *pubsub.Messag
 	for {
 		msg, err := handle.Next(i.cancelCtx)
 		if err != nil {
-			log.Info("Failed to receve message: %s", err.Error())
+			log.Infof("Failed to receve message: %s", err.Error())
 			continue
 		}
 
@@ -212,7 +212,7 @@ func (i *Instance) connectToNewPeer(ctx context.Context) {
 
 			// Don't connect to new peers if peer limit exceeded
 			if i.nbOfPeers >= i.thisconfig.PeerLimit {
-				log.Warn(
+				log.Warnf(
 					"Peer limit %d exceeded, ignore newly discovered peer %s",
 					i.thisconfig.PeerLimit,
 					p.ID,
@@ -225,13 +225,13 @@ func (i *Instance) connectToNewPeer(ctx context.Context) {
 			i.peersLock.Unlock()
 			err := (*i.Host).Connect(context.Background(), p)
 			if err != nil {
-				log.Warn("Failed to connect to peer %s: %s", p.ID, err.Error())
+				log.Warnf("Failed to connect to peer %s: %s", p.ID, err.Error())
 				log.Warn("Start retry to connect to peer...")
 				go i.tryConnect(10, p)
 				continue
 			}
 			i.increaseNbOfPeers()
-			log.Info("Successfully establised connection to peer %s", p.ID)
+			log.Infof("Successfully establised connection to peer %s", p.ID)
 			continue
 		case <-ctx.Done():
 			return
@@ -247,16 +247,16 @@ func (i *Instance) tryConnect(cnt int, p peer.AddrInfo) {
 		case <-t.C:
 			err := (*i.Host).Connect(context.Background(), p)
 			if err != nil {
-				log.Warn("Failed to connect to peer %s: %s, retry after 5 seconds...", p.ID, err.Error())
+				log.Warnf("Failed to connect to peer %s: %s, retry after 5 seconds...", p.ID, err.Error())
 				continue
 			}
 
 			i.increaseNbOfPeers()
-			log.Info("Successfully establised connection to peer %s", p.ID)
+			log.Infof("Successfully establised connection to peer %s", p.ID)
 			return
 		}
 	}
-	log.Warn("Retry limit exceeded, will not continue trying to connect to peer %s", p.ID)
+	log.Warnf("Retry limit exceeded, will not continue trying to connect to peer %s", p.ID)
 }
 
 // increaseNbOfPeers is a synchronisation-safe operation that increase number of peers in the instance by 1
@@ -265,7 +265,7 @@ func (i *Instance) increaseNbOfPeers() {
 	defer i.peersLock.Unlock()
 
 	i.nbOfPeers++
-	log.Info("Number of peers discovered and connected to: %d", i.nbOfPeers)
+	log.Infof("Number of peers discovered and connected to: %d", i.nbOfPeers)
 }
 
 // NewDefaultP2PHost initialise a new libp2p host

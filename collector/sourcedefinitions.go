@@ -49,13 +49,16 @@ var SourcesNFTExchange = []Source{
 }
 
 // The global table with all our sources.
-var Sources = append(SourcesCEX, SourcesBlockchainRPC...)
+var Sources = []Source{}
 
 func init() {
 	// Note(Tom): Have to do this here otherwise we'll get a initialization cycle.
 	for i := range SourcesCEX {
 		SourcesCEX[i].ParseFunc = parseCEX
 	}
+
+	// Have to initialize here because we want the CEX sources keep their changes.
+	Sources = append(SourcesCEX, SourcesBlockchainRPC...)
 }
 
 func panicStubFunctionSeeBodyForExplanation(source Source, data []byte) []byte {

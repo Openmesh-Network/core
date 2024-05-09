@@ -44,7 +44,7 @@ logs
 
 # Get rid of cbft-data
 /cbft-home/data
-/cbft-home/data/priv_validator_state.json
+!/cbft-home/data/priv_validator_state.json
 /cbft-home/config/write-file-*
 /cbft-home/config/*_key.json
 

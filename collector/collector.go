@@ -126,7 +126,7 @@ func (ci *CollectorInstance) SubmitRequests(requests []Request, requestsNext []R
 				r = requestsNext[index]
 			}
 
-			log.Info("Subscribing ", index)
+			log.Info("Subscribing ", requests[index])
 
 			var messageChannel chan []byte
 			if anchorMode || !nextNodeIsAnchor {
