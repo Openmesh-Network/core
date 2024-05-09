@@ -22,9 +22,9 @@ import (
 	rpctypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/openmesh-network/core/collector"
+	"github.com/openmesh-network/core/config"
 	abci "github.com/openmesh-network/core/internal/bft/abci"
 	otypes "github.com/openmesh-network/core/internal/bft/types"
-	"github.com/openmesh-network/core/internal/config"
 	log "github.com/openmesh-network/core/internal/logger"
 	"github.com/spf13/viper"
 )
