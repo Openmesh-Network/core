@@ -3,11 +3,10 @@ package core
 import (
 	"context"
 
+	"github.com/openmesh-network/core/config"
 	"github.com/openmesh-network/core/internal/bft"
-	"github.com/openmesh-network/core/internal/config"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
-	log "github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/networking/p2p"
 )
 
@@ -46,7 +45,7 @@ func (i *Instance) Start(ctx context.Context) {
 	}
 
 	if config.Config.P2P.DebugAutoconnectMultiaddr != "" {
-		log.Debug("Connecting to libp2p multiaddress in config...")
+		logger.Debug("Connecting to libp2p multiaddress in config...")
 		i.pi.ConnectFromMultiaddr(ctx, config.Config.P2P.DebugAutoconnectMultiaddr)
 	}
 
