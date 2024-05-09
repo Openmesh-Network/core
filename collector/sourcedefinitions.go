@@ -31,6 +31,7 @@ var SourcesCEX = []Source{
 		panicStubFunctionSeeBodyForExplanation,
 		"wss://ws.okx.com:8443/ws/v5/business",
 		[]string{"sprd-bbo-tbt", "sprd-books5", "sprd-public-trades", "sprd-tickers"},
+		// XXX: Why does it say BTC-USDT_BTC-USDT-SWAP?
 		`{"op": "subscribe","args": [{"channel": "{{topic}}","sprdId": "BTC-USDT_BTC-USDT-SWAP"}]}`,
 	},
 }
