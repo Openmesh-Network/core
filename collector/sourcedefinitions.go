@@ -37,8 +37,8 @@ var SourcesCEX = []Source{
 }
 
 var SourcesBlockchainRPC = []Source{
-	{"ethereum-ankr-rpc", ankrJoinRPC, nil, "https://rpc.ankr.com/eth", []string{""}, ""},
-	{"polygon-ankr-rpc", ankrJoinRPC, nil, "https://rpc.ankr.com/polygon", []string{""}, ""},
+	{"ethereum-ankr-rpc", joinEthereumRPC, nil, "https://rpc.ankr.com/eth", []string{""}, ""},
+	{"polygon-ankr-rpc", joinEthereumRPC, nil, "https://rpc.ankr.com/polygon", []string{""}, ""},
 }
 
 var SourcesNFTExchange = []Source{

@@ -192,7 +192,7 @@ func okxJoinCEX(ctx context.Context, source Source, topic string) (chan []byte, 
 	return msgChannel, errChannel, nil
 }
 
-func ankrJoinRPC(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
+func joinEthereumRPC(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
 	ethereum_client, err := ethclient.Dial(source.ApiURL)
 	if err != nil {
 		return nil, nil, err

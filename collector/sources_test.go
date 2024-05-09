@@ -78,7 +78,7 @@ func TestAnkrJoin(t *testing.T) {
 
 	t.Log("Got here no issue")
 	t.Log(Sources[4].Topics[0])
-	msgChan, errChan, err := ankrJoinRPC(ctx, Sources[4], Sources[4].Topics[0])
+	msgChan, errChan, err := joinEthereumRPC(ctx, Sources[4], Sources[4].Topics[0])
 
 	if err != nil {
 		t.Error(err)
@@ -195,7 +195,7 @@ func TestAnkrPolygonJoin(t *testing.T) {
 
 	t.Log("Got here no issue")
 	t.Log(Sources[4].Topics[0])
-	msgChan, errChan, err := ankrJoinRPC(ctx, Sources[5], Sources[5].Topics[0])
+	msgChan, errChan, err := joinEthereumRPC(ctx, Sources[5], Sources[5].Topics[0])
 
 	if err != nil {
 		t.Error(err)
