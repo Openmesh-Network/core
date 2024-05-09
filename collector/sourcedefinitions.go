@@ -3,8 +3,20 @@ package collector
 var SourcesCEX = []Source{
 	// Centralised Exchanges:
 	// Note that the topics are incomplete as they are undecided.
-	{"binance", defaultJoinCEX, panicStubFunctionSeeBodyForExplanation, "wss://stream.binance.com:9443/ws", []string{"btcusdt", "ethusdt", "solusdt"}, "{ \"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1 }"},
-	{"coinbase", defaultJoinCEX, panicStubFunctionSeeBodyForExplanation, "wss://ws-feed.pro.coinbase.com", []string{"BTC-USD", "ETH-USD", "BTC-ETH"}, "{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"},
+	{
+		"binance",
+		defaultJoinCEX,
+		panicStubFunctionSeeBodyForExplanation,
+		"wss://stream.binance.com:9443/ws",
+		[]string{"btcusdt", "ethusdt", "solusdt"},
+		"{ \"method\": \"SUBSCRIBE\", \"params\": [ \"{{topic}}@aggTrade\" ], \"id\": 1 }"},
+	{
+		"coinbase",
+		defaultJoinCEX,
+		panicStubFunctionSeeBodyForExplanation,
+		"wss://ws-feed.pro.coinbase.com",
+		[]string{"BTC-USD", "ETH-USD", "BTC-ETH"},
+		"{\"type\": \"subscribe\", \"product_ids\": [ \"{{topic}}\" ], \"channels\": [ \"ticker\" ]}"},
 
 	{
 		"dydx",
@@ -36,9 +48,24 @@ var SourcesCEX = []Source{
 	},
 }
 
+// Should handle these as a separate case, since blockchain information can exactly be consistent from different sources.
 var SourcesBlockchainRPC = []Source{
-	{"ethereum-ankr-rpc", joinEthereumRPC, nil, "https://rpc.ankr.com/eth", []string{""}, ""},
-	{"polygon-ankr-rpc", joinEthereumRPC, nil, "https://rpc.ankr.com/polygon", []string{""}, ""},
+	{
+		"ethereum-ankr-rpc",
+		joinEthereumRPC,
+		nil,
+		"https://rpc.ankr.com/eth",
+		[]string{""},
+		"",
+	},
+	{
+		"polygon-ankr-rpc",
+		joinEthereumRPC,
+		nil,
+		"https://rpc.ankr.com/polygon",
+		[]string{""},
+		"",
+	},
 }
 
 var SourcesNFTExchange = []Source{

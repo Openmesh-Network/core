@@ -3,7 +3,7 @@ package logger
 import (
 	"testing"
 
-	"github.com/openmesh-network/core/internal/config"
+	"github.com/openmesh-network/core/config"
 	"github.com/stretchr/testify/assert"
 )
 

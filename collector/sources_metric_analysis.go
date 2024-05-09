@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openmesh-network/core/internal/config"
+	"github.com/openmesh-network/core/config"
 	log "github.com/openmesh-network/core/internal/logger"
 )
 

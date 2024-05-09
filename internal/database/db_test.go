@@ -6,7 +6,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multicodec"
-	"github.com/openmesh-network/core/internal/config"
+	"github.com/openmesh-network/core/config"
 )
 
 // Mock data for testing

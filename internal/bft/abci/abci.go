@@ -14,8 +14,8 @@ import (
 	// "math/rand"
 	crypt "github.com/cometbft/cometbft/proto/tendermint/crypto"
 	"github.com/openmesh-network/core/collector"
+	"github.com/openmesh-network/core/config"
 	"github.com/openmesh-network/core/internal/bft/types"
-	"github.com/openmesh-network/core/internal/config"
 	log "github.com/openmesh-network/core/internal/logger"
 )
 

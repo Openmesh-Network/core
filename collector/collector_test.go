@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/openmesh-network/core/internal/config"
+	"github.com/openmesh-network/core/config"
 	"github.com/openmesh-network/core/networking/p2p"
 	"github.com/openmesh-network/core/resourcepool"
 )
@@ -20,7 +20,6 @@ import (
 // 	dummysource,
 // 	0,
 // }
-
 
 func dummyjoin(ctx context.Context, source Source, topic string) (chan []byte, <-chan error, error) {
 	return nil, nil, nil
