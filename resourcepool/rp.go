@@ -2,6 +2,7 @@ package resourcepool
 
 import (
 	"context"
+	"log"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -44,6 +45,7 @@ type BlockManager struct {
 
 	blocksUsed       int
 	blocksTotal      int
+	chunkSize        int
 	buckets          []cid.Cid
 	cidToBucketIndex map[cid.Cid]int // 0 index is invalid.
 	bService         blockservice.BlockService
@@ -72,9 +74,10 @@ func (inst *Instance) Start(ctx context.Context) {
 
 	blockCount := 64
 	inst.Bmanager = &BlockManager{
-		blocksUsed:       1,
+		blocksUsed:       0,
 		blocksTotal:      blockCount,
 		buckets:          make([]cid.Cid, blockCount),
+		chunkSize:        DEFAULT_CHUNK_SIZE,
 		cidToBucketIndex: make(map[cid.Cid]int),
 		bService:         inst.Bservice,
 	}
@@ -86,43 +89,91 @@ func (inst *Instance) Stop() {
 
 // TODO:
 // - Add mutex to avoid race condition.
-// - Make this work with many blocks (Actual common case).
-func (bm *BlockManager) AddBlockWithFixedChunk(ctx context.Context, b blocks.Block) {
-	// Basic sanity check
-	if len(b.RawData()) != DEFAULT_CHUNK_SIZE {
-		panic("Block doesn't match raw data size. ERROR.")
-	}
+var blocksNew = make([]blocks.Block, 1024)
 
-	// Check if it's already been added.
-	if bm.cidToBucketIndex[b.Cid()] != 0 {
+func (bm *BlockManager) AddBlock(ctx context.Context, b blocks.Block) {
+	bs := [1]blocks.Block{b}
+
+	bm.AddBlocks(ctx, bs[:])
+}
+
+func (bm *BlockManager) AddBlocks(ctx context.Context, bs []blocks.Block) {
+	if bs == nil {
+		// XXX: Should panic here maybe?
 		return
 	}
 
-	// Check the allocated space can fit this new block.
-	if bm.blocksTotal-bm.blocksTotal > 0 {
-		found := false
+	// Basic sanity checks
+	if len(bs) > cap(blocksNew) {
+		// XXX: Could fix this with recursive call.
+		log.Panicln("More blocks in request than expected! Got: ", len(bs), ", target is: ", len(blocksNew))
+	}
+
+	if len(bs) > len(bm.buckets) {
+		panic("More blocks in request than total avaiable buckets.")
+	}
+
+	for _, b := range bs {
+		if len(b.RawData()) != bm.chunkSize {
+			panic("Block doesn't match raw data size. ERROR.")
+		}
+	}
+
+	// Check if it's already been added.
+	{
+		blocksNew = blocksNew[:0]
+
+		for _, b := range bs {
+			if bm.cidToBucketIndex[b.Cid()] == 0 {
+				blocksNew = append(blocksNew, b)
+			}
+		}
+	}
+
+	addBlocks := func(blocksFit []blocks.Block) {
+		// Find one bucket for each of the new blocks.
+		blockOffset := 0
 		for i := range bm.buckets {
-			if bm.buckets[i].Bytes() == nil {
+			if blockOffset >= len(blocksFit) {
+				break
+			}
+
+			if bm.buckets[i] == cid.Undef {
+				b := blocksFit[blockOffset]
 				bm.buckets[i] = b.Cid()
 				bm.cidToBucketIndex[b.Cid()] = i + 1
 				bm.bService.AddBlock(ctx, b)
 
-				found = true
+				blockOffset += 1
+				bm.blocksUsed += 1
 			}
 		}
 
-		if !found {
-			panic("This should never happen. There's blockTotal - blockUsed.")
+		if blockOffset < len(blocksFit) {
+			panic("This should never happen. blockOffset should equal len(blocksFit).")
 		}
+	}
+
+	// Check the allocated space can fit this new block.
+	if len(blocksNew) == 0 {
+		return
+	} else if bm.blocksTotal-bm.blocksUsed >= len(blocksNew) {
+		addBlocks(blocksNew)
 	} else {
+		blocksUsedBeforeAdding := bm.blocksUsed
+		addBlocks(blocksNew[:bm.blocksTotal-bm.blocksUsed])
+		blocksLeft := blocksNew[bm.blocksTotal-blocksUsedBeforeAdding:]
+
 		// If not, work out what to delete or if to delete anything.
 		// Delete older stuff and keep newer stuff.
 		// For now assume all blocks are equal.
 
-		{ // Should consider deleting any blocks which have been safely upladed maybe?
+		// Add the ones that fit.
+
+		{ // Consider rejecting this incoming block maybe?
 		}
 
-		{ // Maybe delete blocks that are
+		{ // Should consider deleting any blocks which have been safely upladed maybe?
 		}
 
 		{ // First approach, just delete oldest blocks. Simple treadmill.
@@ -132,21 +183,28 @@ func (bm *BlockManager) AddBlockWithFixedChunk(ctx context.Context, b blocks.Blo
 			//	  Ideally we'd want to avoid doing this as much as is possible.
 			//	- Doesn't take into account the kind of block we're storing.
 
-			// XXX: Might have to replace with linked list, since we coudl be dealing with thousands of items here.
+			// XXX: Might have to replace with linked list, since we could be dealing with thousands of items here.
 			// Possible optimization.
-			oldCid := bm.buckets[0]
-			bm.bService.DeleteBlock(ctx, oldCid)
 
-			copy(bm.buckets[:], bm.buckets[1:])
-			bm.buckets[len(bm.buckets)-1] = b.Cid()
+			for i := range bm.buckets[:len(blocksLeft)] {
+				oldCid := bm.buckets[i]
+				bm.bService.DeleteBlock(ctx, oldCid)
+				bm.blocksUsed -= 1
+			}
+
+			copy(bm.buckets[:], bm.buckets[len(blocksLeft):])
+
+			for i := range bm.buckets[len(bm.buckets)-len(blocksLeft):] {
+				bm.buckets[i] = cid.Undef
+			}
+
+			addBlocks(blocksLeft)
 
 			// Have to do this since all indeces are changed now.
 			// XXX: Might have to replace this for performance.
 			for i, c := range bm.buckets {
 				bm.cidToBucketIndex[c] = i + 1
 			}
-
-			bm.blocksTotal -= 1
 		}
 	}
 

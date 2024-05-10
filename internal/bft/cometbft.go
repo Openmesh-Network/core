@@ -26,18 +26,19 @@ import (
 	abci "github.com/openmesh-network/core/internal/bft/abci"
 	otypes "github.com/openmesh-network/core/internal/bft/types"
 	log "github.com/openmesh-network/core/internal/logger"
+	"github.com/openmesh-network/core/resourcepool"
 	"github.com/spf13/viper"
 )
 
 // Instance is the CometBFT instance
 type Instance struct {
-	Config     *cfg.Config
-	Addr       []byte
-	BftNode    *nm.Node
-	Collector  *collector.CollectorInstance
-	app        *abci.VerificationApp
-	collector  *collector.CollectorInstance
-	FullPubKey []byte
+	Config       *cfg.Config
+	Addr         []byte
+	BftNode      *nm.Node
+	FullPubKey   []byte
+	app          *abci.VerificationApp
+	collector    *collector.CollectorInstance
+	blockmanager *resourcepool.BlockManager
 }
 
 // NewInstance initialise a CometBFT instance use the config specified
@@ -185,7 +186,6 @@ func (inst *Instance) Start(ctx context.Context) {
 
 								if err != nil {
 									log.Error("Failed to push registration transaction: ", err)
-									// panic(err)
 								} else {
 									log.Debug("Succesfully pushed registration transaction!")
 									registerSentTransaction = true
@@ -194,7 +194,6 @@ func (inst *Instance) Start(ctx context.Context) {
 						}
 					}
 				} else {
-
 					requests := inst.app.GetRequestsDue()
 					requestsNext := inst.app.GetRequestsDueNext()
 
