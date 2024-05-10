@@ -1,7 +1,7 @@
 const protobuf = require("protobufjs");
 const axios = require("axios");
 
-protobuf.load("../internal/bft/types/transaction.proto", async function (err, root) {
+protobuf.load("../bft/types/transaction.proto", async function (err, root) {
     if (err) {
         throw err;
     }
