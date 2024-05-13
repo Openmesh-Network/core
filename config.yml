@@ -1,3 +1,4 @@
+
 p2p:
   # 0.0.0.0 = localhost
   addr: 0.0.0.0
@@ -5,6 +6,14 @@ p2p:
   port: 0
   groupName: xnode
   peerLimit: 50
+nft:
+  rpcAddress: https://rpc.ankr.com/eth_sepolia
+  unlimitedRPC: false
+  eventSignature: Redeemed(uint256,bytes32)
+  searchLimit: 3000
+  deployBlock: 5618691
+  confirmations: 20
+  timing: 90
 bft:
   homeDir: cbft-home
 db:
@@ -30,7 +39,5 @@ log:
     maxSize: 10
     maxAge: 7
     maxBackups: 10
-nft:
-  trackerData: ./cbft/data/nft-tracked
-  rpcAddress: https://rpc.ankr.com/eth_sepolia
-  unlimitedRPC: false
+
+  

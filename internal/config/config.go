@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/spf13/viper"
 	"log"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 // Config is a global variable that hold all the configurations need by the whole project
@@ -12,6 +13,7 @@ var Config config
 
 // config is the configuration structure for the whole Openmesh Core project
 type config struct {
+	Nft TrConfig  `yaml:"nft"`
 	P2P P2pConfig `yaml:"p2p"`
 	BFT BFTConfig `yaml:"bft"`
 	Log LogConfig `yaml:"log"`
@@ -24,6 +26,16 @@ type P2pConfig struct {
 	Port      int    `yaml:"port"`      // libp2p listening port
 	GroupName string `yaml:"groupName"` // Name used for discovering nodes via mDNS
 	PeerLimit int    `yaml:"peerLimit"` // Max number of peers this node can establish connection to
+}
+
+type TrConfig struct {
+	RpcAddress     string `yaml:"rpcAddress"`
+	UnlimitedRPC   bool   `yaml:"unlimitedRPC"`
+	EventSignature string `yaml:"eventSignature"`
+	SearchLimit    int    `yaml:"searchLimit"`
+	DeployBlock    int    `yaml:"DeployBlock"` // Corrected field name
+	Confirmations  int    `yaml:"confirmations"`
+	Timing         int    `yaml:"timing"` // Corrected field name
 }
 
 // DBConfig is the configuration for database connection and operation
@@ -80,7 +92,7 @@ func ParseConfig(configAtCompileTime string, useRuntimeConfigFile bool) {
 			// This should NEVER run! We can't allow faulty configs to be compiled to the executable.
 			panic(err)
 		}
-	} else  {
+	} else {
 		coreConf.AddConfigPath(Path)
 		coreConf.SetConfigName(Name)
 		coreConf.SetConfigType("yaml")
@@ -88,7 +100,7 @@ func ParseConfig(configAtCompileTime string, useRuntimeConfigFile bool) {
 		if err := coreConf.ReadInConfig(); err != nil {
 			log.Fatalf("Failed to read the configuration: %s", err.Error())
 		}
-	} 
+	}
 
 	if err := coreConf.Unmarshal(&Config); err != nil {
 		log.Fatalf("Failed to parse the configuration: %s", err.Error())

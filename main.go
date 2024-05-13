@@ -17,6 +17,7 @@ import (
 	"github.com/openmesh-network/core/internal/core"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
+	"github.com/openmesh-network/core/internal/tracker"
 	"github.com/openmesh-network/core/updater"
 )
 
@@ -65,11 +66,16 @@ func main() {
 
 	// Initialise BadgerDB connection
 	dbInstance, err := database.NewInstance()
+
 	if err != nil {
 		logger.Fatalf("Failed to establish BadgerDB connection: %s", err.Error())
 	}
+	trackerInstance, err := tracker.NewInstance()
+	if err != nil {
+		logger.Fatalf("Failed to initialise tracker instance: %s", err.Error())
+	}
 
-	// Need collector before bft.
+	// Need collector before bft
 	var collectorInstance *collector.CollectorInstance
 	collectorInstance = nil
 	// collectorInstance = collector.New()
@@ -89,7 +95,8 @@ func main() {
 	ins := core.NewInstance().
 		//SetP2pInstance(p2pInstance).
 		SetDBInstance(dbInstance).
-		SetBFTInstance(bftInstance)
+		SetBFTInstance(bftInstance).
+		SetTrackerInstance(trackerInstance)
 	ins.Start(cancelCtx)
 	logger.Infof("Openmesh Core started successfully.")
 	defer ins.Stop()

@@ -3,8 +3,10 @@ package verificationApp
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"sort"
 
+	validatorpass_tracker "github.com/Openmesh-Network/nft-authorise/tracker"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	nm "github.com/cometbft/cometbft/node"
 	comettype "github.com/cometbft/cometbft/types"
@@ -31,6 +33,8 @@ type VerificationApp struct {
 	Node                   *nm.Node
 	CurrentMempool         []comettype.Tx
 	Currblockno            int64
+	PolygonCheckpoint      uint64
+	Tracker                *validatorpass_tracker.Tracker
 }
 
 const VALIDATOR_PREALLOCATED_COUNT = 2000
@@ -96,8 +100,26 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 	}
 	log.Debug("Marshaling Done")
 	transactions := comettype.Tx(transactionBytes[:])
-	proposal.Txs = append(othertx, transactions)
 
+	transactionMessage_checkpoint := types.Transaction{
+		Owner:     "trial",
+		Signature: "",
+		Type:      *types.TransactionType_PolygonCheckpointTransaction.Enum(),
+	}
+	transactionMessage_checkpoint.Data = &types.Transaction_PolygonCheckpointTransactionData{
+		PolygonCheckpointTransactionData: &types.PolygonCheckpointTransactionData{
+			Blockno:   uint64(app.Tracker.LastTrackerHeight),
+			Blockhash: "xyz", //not a necessary field just nice to have for record keeping
+		},
+	}
+	transactionBytes_Checkpoint, err := proto.Marshal(&transactionMessage_checkpoint)
+	if err != nil {
+		panic(err)
+	}
+
+	transactions_checkpoint := comettype.Tx(transactionBytes_Checkpoint[:])
+	proposal.Txs = append(othertx, transactions, transactions_checkpoint)
+	log.Debug(proposal.Txs)
 	return &abcitypes.ResponsePrepareProposal{Txs: proposal.Txs}, nil
 }
 func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
@@ -143,6 +165,7 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 
 		if code := app.isValid(tx); code != 0 {
 			// log.Error("Error: invalid transaction index %v", i)
+			log.Error("A transaction got error")
 			return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_REJECT}, nil
 		} else {
 			var transaction types.Transaction
@@ -151,8 +174,9 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 				log.Error("Error unmarshaling transaction data:", err)
 				return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_REJECT}, nil
 			}
-
+			log.Debug(transaction.Type)
 			switch transaction.Type {
+
 			case types.TransactionType_SummaryTransaction:
 
 				summaryData := &types.SummaryTransactionData{}
@@ -168,6 +192,20 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 				}
 				log.Debug("they are similar")
 
+			case types.TransactionType_PolygonCheckpointTransaction:
+				log.Debug("polygon tx found")
+				checkpointData := &types.PolygonCheckpointTransactionData{}
+				checkpointData = transaction.GetPolygonCheckpointTransactionData()
+
+				if err != nil {
+					log.Error("Cannot decode tx")
+					return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_REJECT}, nil
+				}
+
+				if checkpointData.Blockno > uint64(app.Tracker.LastTrackerHeight) {
+					return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_REJECT}, nil
+				}
+				log.Debug("the height is okay,the proposed height is ", checkpointData.Blockno, "the current height is", app.Tracker.LastTrackerHeight)
 			default:
 				log.Debug(transaction.Type)
 				log.Debug("Unknown transaction type")
@@ -286,6 +324,12 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 				log.Debug("Node succesfully registered: ", len(validatorupdates))
 				// log.Debug("Node Registration Transaction Data:", registrationData)
 
+			case types.TransactionType_PolygonCheckpointTransaction:
+				polygonData := &types.PolygonCheckpointTransactionData{}
+				polygonData = transaction.GetPolygonCheckpointTransactionData()
+				app.PolygonCheckpoint = polygonData.Blockno
+				fmt.Println("The polygon checkpoint is ", app.PolygonCheckpoint)
+				txs[i] = &abcitypes.ExecTxResult{}
 			case types.TransactionType_SummaryTransaction:
 				txs[i] = &abcitypes.ExecTxResult{}
 			default:
@@ -479,6 +523,17 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 		nodeRegistrationData = transaction.GetNodeRegistrationData()
 
 		if nodeRegistrationData == nil {
+			log.Error("Error unmarshaling resource transaction data:", err)
+			return 1
+		}
+		// log.Debug("Resource Transaction Data:", nodeRegistrationData)
+		return 0
+
+	case types.TransactionType_PolygonCheckpointTransaction:
+		polygonData := &types.PolygonCheckpointTransactionData{}
+		polygonData = transaction.GetPolygonCheckpointTransactionData()
+
+		if polygonData == nil {
 			log.Error("Error unmarshaling resource transaction data:", err)
 			return 1
 		}

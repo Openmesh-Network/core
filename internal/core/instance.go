@@ -6,14 +6,16 @@ import (
 	"github.com/openmesh-network/core/internal/bft"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
+	"github.com/openmesh-network/core/internal/tracker"
 	"github.com/openmesh-network/core/networking/p2p"
 )
 
 // Instance is the top-level instance
 type Instance struct {
-	pi  *p2p.Instance
-	DB  *database.Instance
-	BFT *bft.Instance
+	pi      *p2p.Instance
+	DB      *database.Instance
+	BFT     *bft.Instance
+	Tracker *tracker.Instance
 }
 
 // NewInstance initialise an empty top-level instance
@@ -36,14 +38,20 @@ func (i *Instance) SetBFTInstance(bft *bft.Instance) *Instance {
 	return i
 }
 
+func (i *Instance) SetTrackerInstance(tracker *tracker.Instance) *Instance {
+	i.Tracker = tracker
+	return i
+}
+
 // Start the top-level instance as well as all the low-level instances
 func (i *Instance) Start(ctx context.Context) {
 	// err := i.pi.Start()
 	// if err != nil {
 	// 	logger.Fatalf("Failed to start p2p instance: %s", err.Error())
 	// }
-
+	i.Tracker.Start(ctx)
 	i.BFT.Start(ctx)
+	i.BFT.SetTracker(i.Tracker.Tracker)
 }
 
 // Stop the top-level instance as well as all the low-level instances

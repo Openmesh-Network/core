@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	validatorpass_tracker "github.com/Openmesh-Network/nft-authorise/tracker"
 	cfg "github.com/cometbft/cometbft/config"
 	cmtflags "github.com/cometbft/cometbft/libs/cli/flags"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
@@ -267,6 +268,11 @@ func (inst *Instance) Start(ctx context.Context) {
 			log.Fatalf("Failed to start CometBFT node: %s", err.Error())
 		}
 	}()
+}
+
+func (i *Instance) SetTracker(tracker *validatorpass_tracker.Tracker) error {
+	i.app.Tracker = tracker
+	return nil
 }
 
 // Stop the CometBFT node

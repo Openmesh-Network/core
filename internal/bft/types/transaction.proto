@@ -1,5 +1,4 @@
 syntax = "proto3";
-option go_package = github.com/openmesh-network/core/internal/bft/types";
 
 enum TransactionType {
   NormalTransaction = 0;
@@ -7,6 +6,12 @@ enum TransactionType {
   ResourceTransaction = 2;
   NodeRegistrationTransaction = 3;
   SummaryTransaction = 4;
+  PolygonCheckpointTransaction = 5;
+}
+
+message PolygonCheckpointTransactionData {
+  uint64 blockno = 1;
+  string blockhash = 2;
 }
 
 message VerificationTransactionData {
@@ -31,7 +36,7 @@ message NormalTransactionData {
 message NodeRegistrationTransactionData {
   string nodeAddress = 1;
   string nodeAttestation = 2;
-  string nodeSignature = 3;
+  string nodeSignature = 3;  
 }
 
 message SummaryTransactionData {
@@ -49,5 +54,6 @@ message Transaction {
     NormalTransactionData normalData = 6; 
     NodeRegistrationTransactionData nodeRegistrationData = 7; 
     SummaryTransactionData SummaryTransactionData = 8;
+    PolygonCheckpointTransactionData  PolygonCheckpointTransactionData = 9;
   }
 }
