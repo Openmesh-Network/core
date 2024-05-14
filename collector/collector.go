@@ -83,6 +83,7 @@ func (ci *CollectorInstance) SubmitRequests(requests []Request, requestsNext []R
 
 	for i := range ci.workers {
 		// Wait until they've finished.
+		// This hangs forever for some reason...
 		<-ci.workers[i].pause
 	}
 
@@ -170,7 +171,12 @@ func (ci *CollectorInstance) SubmitRequests(requests []Request, requestsNext []R
 							}
 						}
 
+						// hash := sha256.Sum256(ci.workers[i+1].anchorMessageBuffer[closestIndex].messageData)
+
+						// fmt.Println("Closest distance: ", closestDistance, string(ci.workers[i+1].anchorMessageBuffer[closestIndex].messageData), base64.StdEncoding.EncodeToString(hash[:]))
 						// Append closest to the buffer for the next chunk.
+						ci.workers[i].rpStream.Reset()
+
 						for _, m := range ci.workers[i+1].anchorMessageBuffer[closestIndex:] {
 							ci.workers[i].rpStream.Append(m.messageData)
 						}

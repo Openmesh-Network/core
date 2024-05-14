@@ -13,14 +13,14 @@ type Stream struct {
 	inst             *Instance
 	buffer           []byte
 	cidHashes        []cid.Cid
-	compressedBuffer []byte
+	// compressedBuffer []byte
 }
 
 func (inst *Instance) NewStream() *Stream {
 	return &Stream{
 		inst:             inst,
-		buffer:           make([]byte, 0, DEFAULT_CHUNK_SIZE*4),
-		compressedBuffer: make([]byte, 0, DEFAULT_CHUNK_SIZE),
+		buffer:           make([]byte, 0, DEFAULT_CHUNK_SIZE),
+		// compressedBuffer: make([]byte, 0, DEFAULT_CHUNK_SIZE),
 		cidHashes:        make([]cid.Cid, 0),
 	}
 }
