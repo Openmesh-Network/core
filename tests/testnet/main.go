@@ -13,9 +13,10 @@ import (
 	"syscall"
 )
 
-const DEFAULT_NODE_COUNT = 30
+const DEFAULT_NODE_COUNT = 5
 const DIR_BASE = "/tmp/cbfttest"
 const INCREMENT_IPS = false
+const ENABLE_PROFILING = true
 const IPFS_AUTOCONNECT_MULTIADDR = "" // Multiaddress to automatically connect new nodes to you can do `ipfs id` to find the multiaddress of your kubo daemon.
 
 // Won't necessarily be compatible with OS ipv4.
@@ -351,6 +352,10 @@ p2p:
   debugAutoconnectMultiaddr: "{{ ipfs-autoconnect-multiaddr }}"
 bft:
   homeDir: {{ bft-home-dir }}
+prof:
+  enable: {{ enable-profiling }}
+  enableHttp: false
+  fileName: {{ profile-file-name }}
 db:
   username: username
   password: password
@@ -383,6 +388,8 @@ nft:
 	fixedYaml := strings.Clone(yaml)
 	fixedYaml = strings.ReplaceAll(fixedYaml, "{{ bft-home-dir }}", absoluteDirectory+"/cbft")
 	fixedYaml = strings.ReplaceAll(fixedYaml, "{{ ipfs-autoconnect-multiaddr }}", IPFS_AUTOCONNECT_MULTIADDR)
+	fixedYaml = strings.ReplaceAll(fixedYaml, "{{ enable-profiling }}", strconv.FormatBool(ENABLE_PROFILING))
+	fixedYaml = strings.ReplaceAll(fixedYaml, "{{ profile-file-name }}", absoluteDirectory+"/cpu.prof")
 
 	os.WriteFile(absoluteDirectory+"/config.yaml", []byte(fixedYaml), 0o777)
 }
