@@ -2,6 +2,8 @@ package collector
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"math"
 	"time"
 
@@ -20,9 +22,10 @@ type Summary struct {
 	DataHashes []cid.Cid
 }
 
-type MessageTimeTuple struct {
+type MessageTimeHash struct {
 	messageData []byte
 	messageTime time.Time
+	messageHash uint64 // last 8 bytes of sha256 of message.
 }
 
 type CollectorWorker struct {
@@ -33,7 +36,7 @@ type CollectorWorker struct {
 	// XXX: Give the anchor message buffer a fixed length? Should improve performance.
 	// Don't want to store all our data .
 	anchorDataBuffer    []byte
-	anchorMessageBuffer []MessageTimeTuple
+	anchorMessageBuffer []MessageTimeHash
 
 	summary  *Summary
 	request  Request
@@ -59,6 +62,7 @@ type CollectorInstance struct {
 // Odd workers look at current. Even workers look ahead?
 // Otherwise I can do a treadmill system.
 const WORKER_COUNT = 2
+const ANCHOR_TIME_RANGE_SECONDS = 2
 
 // const BUFFER_SIZE_MAX = 1024
 // const BUFFER_MAX = 1024
@@ -67,7 +71,7 @@ func NewInstance(rpInstance *resourcepool.Instance) *CollectorInstance {
 	return &CollectorInstance{rpInstance: rpInstance}
 }
 
-func (ci *CollectorInstance) SubmitRequests(requests []Request, requestsNext []Request, targetAnchorTime time.Time) []Summary {
+func (ci *CollectorInstance) SubmitRequests(requests []Request, requestsNext []Request, targetAnchorTime time.Time, targetAnchorValue uint64) []Summary {
 	if ci.subscriptionsCancel != nil {
 		ci.subscriptionsCancel()
 	}
@@ -159,21 +163,29 @@ func (ci *CollectorInstance) SubmitRequests(requests []Request, requestsNext []R
 					// Find the message in the next nodes that's closest to the time.
 					if nextNodeIsAnchor {
 						// The next worker is in anchor mode, they have the data.
+
+						// TODO: Decouple this code for testing.
 						closestIndex := 0
-						closestDistance := math.MaxInt
+						closestDistance := uint64(math.MaxUint64)
 
 						for pairIndex, pair := range ci.workers[i+1].anchorMessageBuffer {
-							dist := (targetAnchorTime.Unix() - pair.messageTime.Unix())
+							// XXX: Consider increasing precision to milliseconds?
+							timeDist := (targetAnchorTime.Unix() - pair.messageTime.Unix())
+							if timeDist < 0 {
+								timeDist *= -1
+							}
 
-							if dist < int64(closestDistance) && dist > 0 {
-								closestDistance = int(dist)
+							dist := targetAnchorValue ^ pair.messageHash
+
+							// Time has to be within minimum range also...
+							// Add that as a constraint
+
+							if dist < uint64(closestDistance) && dist > 0 && timeDist < ANCHOR_TIME_RANGE_SECONDS {
+								closestDistance = uint64(dist)
 								closestIndex = pairIndex
 							}
 						}
 
-						// hash := sha256.Sum256(ci.workers[i+1].anchorMessageBuffer[closestIndex].messageData)
-
-						// fmt.Println("Closest distance: ", closestDistance, string(ci.workers[i+1].anchorMessageBuffer[closestIndex].messageData), base64.StdEncoding.EncodeToString(hash[:]))
 						// Append closest to the buffer for the next chunk.
 						ci.workers[i].rpStream.Reset()
 
@@ -189,7 +201,6 @@ func (ci *CollectorInstance) SubmitRequests(requests []Request, requestsNext []R
 			}
 		}
 
-		// subscribeWaitGroup.Go(subscribeFunc)
 		subscribeFunc()
 	}
 
@@ -211,74 +222,73 @@ func (cw *CollectorWorker) run(ctx context.Context) {
 	log.Info("Started worker.")
 
 	printedDebug := false
-	paused := false
 	log.Info("Running for loop.")
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Info("Context cancelled.")
 			return
-		default:
-			if paused {
-				select {
-				case <-cw.resume:
-					log.Info("Worker resumed.")
-					paused = false
 
-					// Tell collector we're done resuming.
-					cw.resume <- true
+		case <-cw.pause:
+			log.Info("Channel stopped.")
 
-					if cw.anchorMode {
-						// Reset the buffers.
-						cw.anchorMessageBuffer = cw.anchorMessageBuffer[:0]
-						cw.anchorDataBuffer = cw.anchorDataBuffer[:0]
-					}
-				}
+			if cw.anchorMode {
+				// Nothing extra to do, just wait...
 			} else {
-				select {
-				case <-cw.pause:
-					log.Info("Channel stopped.")
+				cw.rpStream.Flush()
+				cw.summary.DataHashes = make([]cid.Cid, len(cw.rpStream.GetCids()))
 
-					if cw.anchorMode {
-						// Nothing extra to do, just wait...
-					} else {
-						cw.rpStream.Flush()
-						cw.summary.DataHashes = make([]cid.Cid, len(cw.rpStream.GetCids()))
+				copy(cw.summary.DataHashes[:], cw.rpStream.GetCids())
+			}
 
-						copy(cw.summary.DataHashes[:], cw.rpStream.GetCids())
-					}
+			log.Info("Worker paused until resume is called.")
 
-					log.Info("Worker paused until resume is called.")
-					paused = true
+			// Tell collector we've finished pausing.
+			cw.pause <- true
 
-					// Tell collector we've finished pausing.
-					cw.pause <- true
+		case <-cw.resume:
+			log.Info("Worker resumed.")
+			if cw.anchorMode {
+				// Reset the buffers.
+				cw.anchorMessageBuffer = cw.anchorMessageBuffer[:0]
+				cw.anchorDataBuffer = cw.anchorDataBuffer[:0]
+			}
 
-				case message := <-cw.message:
-					// XXX: This looks ugly, whatever.
-					if len(message) == 0 {
-						if !printedDebug {
-							log.Info("Got message with length 0, that means we probs disconnected :(")
-						}
-						printedDebug = true
-						break
-					}
+			// Tell collector we're done resuming.
+			cw.resume <- true
 
-					if cw.anchorMode {
-						start := len(cw.anchorDataBuffer)
-						cw.anchorDataBuffer = append(cw.anchorDataBuffer, message...)
-						cw.anchorMessageBuffer = append(cw.anchorMessageBuffer, MessageTimeTuple{
-							// XXX: Message data is a slice into the buffer.
-							// Note this means the buffer should be copied later on.
-							messageData: cw.anchorDataBuffer[start : start+len(message)],
-							messageTime: time.Now(),
-						})
-					} else {
-						cw.rpStream.Append(message)
-					}
+		case message := <-cw.message:
+			// XXX: This looks ugly, whatever.
+			if len(message) == 0 {
+				if !printedDebug {
+					log.Info("Got message with length 0, that means we probs disconnected :(")
 				}
+				printedDebug = true
+				break
+			}
+
+			if cw.anchorMode {
+				start := len(cw.anchorDataBuffer)
+				// XXX: Todo, consider capping this after a certain number of messages on the same round?
+				//	Might run out of memory otherwise.
+				cw.anchorDataBuffer = append(cw.anchorDataBuffer, message...)
+				hash := sha256.Sum256(message)
+				hashInt := binary.LittleEndian.Uint64(hash[:8])
+
+				cw.anchorMessageBuffer = append(cw.anchorMessageBuffer, MessageTimeHash{
+					// XXX: Message data is a slice into the buffer.
+					// Note this means the buffer should be copied later on.
+					messageData: cw.anchorDataBuffer[start : start+len(message)],
+					messageTime: time.Now(),
+					messageHash: hashInt,
+				})
+			} else {
+				cw.rpStream.Append(message)
 			}
 		}
+
+		time.Sleep(time.Microsecond * 1000)
 	}
 }
 
@@ -298,7 +308,7 @@ func (ci *CollectorInstance) Start(ctx context.Context) {
 		} else {
 			ci.workers[i].anchorMode = true
 			ci.workers[i].anchorDataBuffer = make([]byte, 0, resourcepool.DEFAULT_CHUNK_SIZE)
-			ci.workers[i].anchorMessageBuffer = make([]MessageTimeTuple, 0, resourcepool.DEFAULT_CHUNK_SIZE)
+			ci.workers[i].anchorMessageBuffer = make([]MessageTimeHash, 0, resourcepool.DEFAULT_CHUNK_SIZE)
 		}
 
 		index := i

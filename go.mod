@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/721tools/stream-api-go v0.0.0-20230909092603-b6a8806ed69a
 	github.com/Jeffail/gabs v1.4.0
+	github.com/bvisness/spall-go v0.0.0-20231031224111-4dca06b14140
 	github.com/cometbft/cometbft v0.38.6
 	github.com/dgraph-io/badger/v3 v3.2103.5
 	github.com/ethereum/go-ethereum v1.14.0
@@ -18,6 +19,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.25.2
 	github.com/libp2p/go-libp2p-pubsub v0.10.0
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.3
+	github.com/minio/sha256-simd v1.0.1
 	github.com/multiformats/go-multiaddr v0.12.2
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/sourcegraph/conc v0.3.0
@@ -132,7 +134,6 @@ require (
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
-	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect

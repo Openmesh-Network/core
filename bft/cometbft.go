@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"strconv"
@@ -205,7 +206,10 @@ func (inst *Instance) Start(ctx context.Context) {
 						if config.Config.BFT.MockTransactions {
 							// Mock transactions of a similar format.
 						} else {
-							summaries = inst.collector.SubmitRequests(requests, requestsNext, time.Now().Add(-time.Second))
+							hash := sha256.Sum256(env.ConsensusState.GetState().LastBlockID.Hash.Bytes())
+							hashInt := binary.LittleEndian.Uint64(hash[:8])
+
+							summaries = inst.collector.SubmitRequests(requests, requestsNext, time.Now().Add(-time.Second), hashInt)
 						}
 					} else {
 						log.Debug("No requests this block :(")
