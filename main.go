@@ -15,7 +15,6 @@ import (
 	"github.com/openmesh-network/core/collector"
 	"github.com/openmesh-network/core/config"
 	"github.com/openmesh-network/core/internal/core"
-	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/networking/p2p"
 	rp "github.com/openmesh-network/core/resourcepool"
@@ -69,12 +68,6 @@ func main() {
 		logger.Fatalf("Failed to initialise p2p instance: %s", err.Error())
 	}
 
-	// Initialise BadgerDB connection
-	dbInstance, err := database.NewInstance()
-	if err != nil {
-		logger.Fatalf("Failed to establish BadgerDB connection: %s", err.Error())
-	}
-
 	rpInstance := rp.NewInstance(p2pInstance)
 	rpInstance.Start(cancelCtx)
 	defer rpInstance.Stop()
@@ -89,7 +82,7 @@ func main() {
 	}
 
 	// Initialise CometBFT instance
-	bftInstance, err := bft.NewInstance(dbInstance.Conn, collectorInstance)
+	bftInstance, err := bft.NewInstance(collectorInstance)
 	if err != nil {
 		logger.Fatalf("Failed to initialise CometBFT instance: %s", err.Error())
 	}
@@ -104,7 +97,6 @@ func main() {
 	// Build and start top-level instance.
 	ins := core.NewInstance().
 		SetP2pInstance(p2pInstance).
-		SetDBInstance(dbInstance).
 		SetBFTInstance(bftInstance)
 	ins.Start(cancelCtx)
 	logger.Infof("Openmesh Core started successfully.")

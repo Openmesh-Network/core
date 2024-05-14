@@ -5,7 +5,6 @@ go 1.21
 require (
 	github.com/721tools/stream-api-go v0.0.0-20230909092603-b6a8806ed69a
 	github.com/Jeffail/gabs v1.4.0
-	github.com/bvisness/spall-go v0.0.0-20231031224111-4dca06b14140
 	github.com/cometbft/cometbft v0.38.6
 	github.com/dgraph-io/badger/v3 v3.2103.5
 	github.com/ethereum/go-ethereum v1.14.0

@@ -13,7 +13,7 @@ import (
 	"syscall"
 )
 
-const DEFAULT_NODE_COUNT = 5
+const DEFAULT_NODE_COUNT = 30
 const DIR_BASE = "/tmp/cbfttest"
 const INCREMENT_IPS = false
 const IPFS_AUTOCONNECT_MULTIADDR = "" // Multiaddress to automatically connect new nodes to you can do `ipfs id` to find the multiaddress of your kubo daemon.
@@ -270,7 +270,7 @@ func main() {
 	}
 
 	fmt.Println("Compiling go program.")
-	cmd := exec.Command("go", "build", "-o", "core", "../..")
+	cmd := exec.Command("go", "build", "-tags", "boltdb", "-o", "core", "../..")
 	err = cmd.Run()
 	if err != nil {
 		panic(err)
