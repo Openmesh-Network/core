@@ -8,7 +8,6 @@ import (
 	"math/rand"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
-	"github.com/dgraph-io/badger/v3"
 	"google.golang.org/protobuf/proto"
 
 	// "math/rand"
@@ -20,8 +19,6 @@ import (
 )
 
 type VerificationApp struct {
-	db                         *badger.DB
-	onGoingBlock               *badger.Txn
 	publicKey                  []byte
 	validatorPrioritiesCurrent [][]collector.Request
 	validatorPrioritiesNext    [][]collector.Request
@@ -82,7 +79,6 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
 	var txs = make([]*abcitypes.ExecTxResult, len(req.Txs))
 
-	app.onGoingBlock = app.db.NewTransaction(true)
 	var validatorupdates = make([]abcitypes.ValidatorUpdate, 0, len(req.Txs))
 
 	for i, tx := range req.Txs {
@@ -302,25 +298,25 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 func (app *VerificationApp) Query(_ context.Context, req *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
 	resp := abcitypes.ResponseQuery{Key: req.Data}
 
-	dbErr := app.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(req.Data)
-		if err != nil {
-			if err != badger.ErrKeyNotFound {
-				return err
-			}
-			resp.Log = "key does not exist"
-			return nil
-		}
+	// 	dbErr := app.db.View(func(txn *badger.Txn) error {
+	// 		item, err := txn.Get(req.Data)
+	// 		if err != nil {
+	// 			if err != badger.ErrKeyNotFound {
+	// 				return err
+	// 			}
+	// 			resp.Log = "key does not exist"
+	// 			return nil
+	// 		}
 
-		return item.Value(func(val []byte) error {
-			resp.Log = "exists"
-			resp.Value = val
-			return nil
-		})
-	})
-	if dbErr != nil {
-		log.Panicf("Error reading database, unable to execute query: %v", dbErr)
-	}
+	// 		return item.Value(func(val []byte) error {
+	// 			resp.Log = "exists"
+	// 			resp.Value = val
+	// 			return nil
+	// 		})
+	// 	})
+	// 	if dbErr != nil {
+	// 		log.Panicf("Error reading database, unable to execute query: %v", dbErr)
+	// 	}
 	return &resp, nil
 }
 
@@ -387,7 +383,7 @@ func (app *VerificationApp) CheckTx(_ context.Context, check *abcitypes.RequestC
 	return &abcitypes.ResponseCheckTx{Code: code}, nil
 }
 
-func NewVerificationApp(publicKey []byte, db *badger.DB) *VerificationApp {
+func NewVerificationApp(publicKey []byte) *VerificationApp {
 	return &VerificationApp{
 		publicKey:                  publicKey,
 		votesNext:                  make([]abcitypes.VoteInfo, 0, 100),
@@ -395,7 +391,7 @@ func NewVerificationApp(publicKey []byte, db *badger.DB) *VerificationApp {
 		validatorPrioritiesCurrent: make([][]collector.Request, 0, VALIDATOR_PREALLOCATED_COUNT),
 		validatorPrioritiesNext:    make([][]collector.Request, 0, VALIDATOR_PREALLOCATED_COUNT),
 		validatorFreeThisRound:     make([]bool, 0, VALIDATOR_PREALLOCATED_COUNT),
-		db:                         db}
+	}
 }
 
 /**
@@ -417,7 +413,7 @@ func (app *VerificationApp) handleResourceTransaction(tx types.ResourceTransacti
 }
 
 func (app VerificationApp) Commit(_ context.Context, commit *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
-	return &abcitypes.ResponseCommit{}, app.onGoingBlock.Commit()
+	return &abcitypes.ResponseCommit{}, nil
 }
 
 func (app *VerificationApp) ListSnapshots(_ context.Context, snapshots *abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {

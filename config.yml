@@ -1,11 +1,13 @@
 p2p:
-  # 0.0.0.0 = localhost
   addr: 0.0.0.0
-  # 0 = random port
   port: 0
   groupName: xnode
   peerLimit: 50
-  debugAutoconnectMultiaddr: "/ip4/10.0.13.206/tcp/4001/p2p/12D3KooWBUyWP6gJF3NvZ7RakgetpLiwJYBGMEkctPBuBpMNsnXJ"
+  debugAutoconnectMultiaddr: 
+prof:
+  enable: true
+  enableHttp: false
+  fileName: cpuprofile.prof
 bft:
   homeDir: cbft-home
   mockTransactions: false

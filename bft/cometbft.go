@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"strconv"
@@ -20,28 +21,28 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	rpctypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
-	"github.com/dgraph-io/badger/v3"
 	abci "github.com/openmesh-network/core/bft/abci"
 	otypes "github.com/openmesh-network/core/bft/types"
 	"github.com/openmesh-network/core/collector"
 	"github.com/openmesh-network/core/config"
 	log "github.com/openmesh-network/core/logger"
+	"github.com/openmesh-network/core/resourcepool"
 	"github.com/spf13/viper"
 )
 
 // Instance is the CometBFT instance
 type Instance struct {
-	Config     *cfg.Config
-	Addr       []byte
-	BftNode    *nm.Node
-	Collector  *collector.CollectorInstance
-	app        *abci.VerificationApp
-	collector  *collector.CollectorInstance
-	FullPubKey []byte
+	Config       *cfg.Config
+	Addr         []byte
+	BftNode      *nm.Node
+	FullPubKey   []byte
+	app          *abci.VerificationApp
+	collector    *collector.CollectorInstance
+	blockmanager *resourcepool.BlockManager
 }
 
 // NewInstance initialise a CometBFT instance use the config specified
-func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instance, error) {
+func NewInstance(collector *collector.CollectorInstance) (*Instance, error) {
 	conf := cfg.DefaultConfig()
 	homeDir := config.Config.BFT.HomeDir
 	conf.SetRoot(homeDir)
@@ -71,7 +72,7 @@ func NewInstance(db *badger.DB, collector *collector.CollectorInstance) (*Instan
 		panic(err)
 	}
 
-	app := abci.NewVerificationApp(publicKey.Bytes(), db)
+	app := abci.NewVerificationApp(publicKey.Bytes())
 
 	nodeKey, err := bftp2p.LoadNodeKey(conf.NodeKeyFile())
 	if err != nil {
@@ -185,7 +186,6 @@ func (inst *Instance) Start(ctx context.Context) {
 
 								if err != nil {
 									log.Error("Failed to push registration transaction: ", err)
-									// panic(err)
 								} else {
 									log.Debug("Succesfully pushed registration transaction!")
 									registerSentTransaction = true
@@ -194,7 +194,6 @@ func (inst *Instance) Start(ctx context.Context) {
 						}
 					}
 				} else {
-
 					requests := inst.app.GetRequestsDue()
 					requestsNext := inst.app.GetRequestsDueNext()
 
@@ -206,7 +205,10 @@ func (inst *Instance) Start(ctx context.Context) {
 						if config.Config.BFT.MockTransactions {
 							// Mock transactions of a similar format.
 						} else {
-							summaries = inst.collector.SubmitRequests(requests, requestsNext, time.Now().Add(-time.Second))
+							hash := sha256.Sum256(env.ConsensusState.GetState().LastBlockID.Hash.Bytes())
+							hashInt := binary.LittleEndian.Uint64(hash[:8])
+
+							summaries = inst.collector.SubmitRequests(requests, requestsNext, time.Now().Add(-time.Second), hashInt)
 						}
 					} else {
 						log.Debug("No requests this block :(")

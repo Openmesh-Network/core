@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/spf13/viper"
 	"log"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 // Config is a global variable that hold all the configurations need by the whole project
@@ -12,10 +13,11 @@ var Config config
 
 // config is the configuration structure for the whole Openmesh Core project
 type config struct {
-	P2P P2pConfig `yaml:"p2p"`
-	BFT BFTConfig `yaml:"bft"`
-	Log LogConfig `yaml:"log"`
-	DB  DBConfig  `yaml:"db"`
+	P2P  P2pConfig `yaml:"p2p"`
+	Prof Profiling `yaml:"prof"`
+	BFT  BFTConfig `yaml:"bft"`
+	Log  LogConfig `yaml:"log"`
+	DB   DBConfig  `yaml:"db"`
 }
 
 type P2pConfig struct {
@@ -24,6 +26,12 @@ type P2pConfig struct {
 	GroupName                 string `yaml:"groupName"`                 // Name used for discovering nodes via mDNS
 	PeerLimit                 int    `yaml:"peerLimit"`                 // Max number of peers this node can establish connection to
 	DebugAutoconnectMultiaddr string `yaml:"debugAutoconnectMultiaddr"` // Multiaddr of node to automatically connect to.
+}
+
+type Profiling struct {
+	Enable     bool   `yaml:"enable"`
+	EnableHttp bool   `yaml:"enableHttp"`
+	FileName   string `yaml:"fileName"`
 }
 
 // DBConfig is the configuration for database connection and operation
@@ -78,6 +86,8 @@ func ParseConfig(configAtCompileTime string, useRuntimeConfigFile bool) {
 
 	if !useRuntimeConfigFile {
 		r := strings.NewReader(configAtCompileTime)
+		coreConf.SetConfigType("yaml")
+
 		if err := coreConf.ReadConfig(r); err != nil {
 			// This should NEVER run! We can't allow faulty configs to be compiled to the executable.
 			panic(err)
