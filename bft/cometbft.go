@@ -25,7 +25,7 @@ import (
 	otypes "github.com/openmesh-network/core/bft/types"
 	"github.com/openmesh-network/core/collector"
 	"github.com/openmesh-network/core/config"
-	log "github.com/openmesh-network/core/internal/logger"
+	log "github.com/openmesh-network/core/logger"
 	"github.com/spf13/viper"
 )
 

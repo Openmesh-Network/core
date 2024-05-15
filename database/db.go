@@ -2,7 +2,7 @@ package database
 
 import (
 	"github.com/dgraph-io/badger/v3"
-	"github.com/openmesh-network/core/internal/logger"
+	"github.com/openmesh-network/core/logger"
 )
 
 // Instance is the instance that holds the database connection for BadgerDB
