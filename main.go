@@ -11,9 +11,9 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/openmesh-network/core/bft"
 	"github.com/openmesh-network/core/collector"
-	"github.com/openmesh-network/core/internal/bft"
-	"github.com/openmesh-network/core/internal/config"
+	"github.com/openmesh-network/core/config"
 	"github.com/openmesh-network/core/internal/core"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"

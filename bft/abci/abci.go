@@ -11,15 +11,15 @@ import (
 	nm "github.com/cometbft/cometbft/node"
 	comettype "github.com/cometbft/cometbft/types"
 	"github.com/dgraph-io/badger/v3"
-	help "github.com/openmesh-network/core/internal/bft/helper"
+	help "github.com/openmesh-network/core/bft/helper"
 	"google.golang.org/protobuf/proto"
 
 	// "math/rand"
 	"crypto/sha256"
 
 	crypt "github.com/cometbft/cometbft/proto/tendermint/crypto"
+	"github.com/openmesh-network/core/bft/types"
 	"github.com/openmesh-network/core/collector"
-	"github.com/openmesh-network/core/internal/bft/types"
 	log "github.com/openmesh-network/core/internal/logger"
 )
 

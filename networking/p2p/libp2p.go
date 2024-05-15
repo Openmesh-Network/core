@@ -17,7 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/openmesh-network/core/internal/config"
+	"github.com/openmesh-network/core/config"
 )
 
 // Instance is the libp2p instance for networking usage.

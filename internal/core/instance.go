@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/openmesh-network/core/internal/bft"
+	"github.com/openmesh-network/core/bft"
 	"github.com/openmesh-network/core/internal/database"
 	"github.com/openmesh-network/core/internal/logger"
 	"github.com/openmesh-network/core/internal/tracker"

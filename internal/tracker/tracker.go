@@ -7,7 +7,7 @@ import (
 	validatorpass_tracker "github.com/Openmesh-Network/nft-authorise/tracker"
 	log "github.com/openmesh-network/core/internal/logger"
 
-	"github.com/openmesh-network/core/internal/config"
+	"github.com/openmesh-network/core/config"
 )
 
 type Instance struct {
