@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
-	log "github.com/openmesh-network/core/internal/logger"
+	log "github.com/openmesh-network/core/logger"
 	"github.com/openmesh-network/core/resourcepool"
 	"github.com/sourcegraph/conc"
 )

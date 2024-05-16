@@ -9,7 +9,7 @@ import (
 
 	"github.com/minio/sha256-simd"
 	"github.com/openmesh-network/core/config"
-	log "github.com/openmesh-network/core/internal/logger"
+	log "github.com/openmesh-network/core/logger"
 	"github.com/openmesh-network/core/networking/p2p"
 	"github.com/openmesh-network/core/resourcepool"
 )

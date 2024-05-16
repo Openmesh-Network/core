@@ -3,19 +3,19 @@ package main
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"net/http"
 	_ "net/http/pprof"
-	"runtime/pprof"
 
 	"github.com/openmesh-network/core/bft"
 	"github.com/openmesh-network/core/collector"
 	"github.com/openmesh-network/core/config"
 	"github.com/openmesh-network/core/internal/core"
-	"github.com/openmesh-network/core/internal/logger"
+	"github.com/openmesh-network/core/logger"
 	"github.com/openmesh-network/core/networking/p2p"
 	rp "github.com/openmesh-network/core/resourcepool"
 	"github.com/openmesh-network/core/updater"
@@ -41,25 +41,15 @@ var (
 )
 
 func main() {
+
+	fmt.Println(configCompileValue)
+
+	go http.ListenAndServe("localhost:8080", nil)
+
 	if useRuntimeConfigFile {
 		config.ParseFlags()
 	}
 	config.ParseConfig(configCompileValue, useRuntimeConfigFile)
-
-	if config.Config.Prof.Enable {
-
-		if config.Config.Prof.EnableHttp {
-			go http.ListenAndServe("localhost:8080", nil)
-		}
-
-		f, err := os.Create(config.Config.Prof.FileName)
-		if err != nil {
-			panic(err)
-		}
-
-		pprof.StartCPUProfile(f)
-	}
-	defer pprof.StopCPUProfile()
 
 	// Initialise logger after parsing configuration
 	logger.InitLogger()

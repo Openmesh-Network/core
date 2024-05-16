@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/openmesh-network/core/config"
-	log "github.com/openmesh-network/core/internal/logger"
+	log "github.com/openmesh-network/core/logger"
 )
 
 type DataWindow struct {

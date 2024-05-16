@@ -5,8 +5,8 @@ import (
 
 	"github.com/openmesh-network/core/bft"
 	"github.com/openmesh-network/core/config"
-	"github.com/openmesh-network/core/internal/database"
-	"github.com/openmesh-network/core/internal/logger"
+	"github.com/openmesh-network/core/database"
+	"github.com/openmesh-network/core/logger"
 	"github.com/openmesh-network/core/networking/p2p"
 )
 

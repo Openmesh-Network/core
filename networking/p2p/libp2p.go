@@ -17,7 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/openmesh-network/core/config"
-	log "github.com/openmesh-network/core/internal/logger"
+	log "github.com/openmesh-network/core/logger"
 )
 
 // Instance is the libp2p instance for networking usage.
