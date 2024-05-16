@@ -16,8 +16,8 @@ import (
 const DEFAULT_NODE_COUNT = 5
 const DIR_BASE = "/tmp/cbfttest"
 const INCREMENT_IPS = false
-const ENABLE_PROFILING = true
-const IPFS_AUTOCONNECT_MULTIADDR = "" // Multiaddress to automatically connect new nodes to you can do `ipfs id` to find the multiaddress of your kubo daemon.
+const ENABLE_PROFILING = false
+const IPFS_AUTOCONNECT_MULTIADDR = "/ip4/10.0.13.206/tcp/4001/p2p/12D3KooWBUyWP6gJF3NvZ7RakgetpLiwJYBGMEkctPBuBpMNsnXJ" // Multiaddress to automatically connect new nodes to you can do `ipfs id` to find the multiaddress of your kubo daemon.
 
 // Won't necessarily be compatible with OS ipv4.
 // Made to work internally only.

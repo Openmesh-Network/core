@@ -84,7 +84,7 @@ func main() {
 
 	// Need collector before bft.
 	var collectorInstance *collector.CollectorInstance
-	if debugMinimalBuild {
+	if config.Config.BFT.MockTransactions {
 		collectorInstance = nil
 	} else {
 		collectorInstance = collector.NewInstance(rpInstance)
@@ -101,7 +101,7 @@ func main() {
 	// TODO: Maybe pass past CID versions to avoid redownloading old updates.
 	if debugMinimalBuild {
 	} else {
-		updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
+		// updater.NewInstance(TrustedKeys, p2pInstance).Start(cancelCtx)
 	}
 
 	// Build and start top-level instance.
