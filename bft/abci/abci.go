@@ -525,16 +525,6 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 		}
 		// log.Debug("Resource Transaction Data:", nodeRegistrationData)
 		return 0
-	case types.TransactionType_NodeRegistrationTransaction:
-		nodeRegistrationData := &types.NodeRegistrationTransactionData{}
-		nodeRegistrationData = transaction.GetNodeRegistrationData()
-
-		if nodeRegistrationData == nil {
-			log.Error("Error unmarshaling resource transaction data:", err)
-			return 1
-		}
-		// log.Debug("Resource Transaction Data:", nodeRegistrationData)
-		return 0
 
 	case types.TransactionType_PolygonCheckpointTransaction:
 		polygonData := &types.PolygonCheckpointTransactionData{}

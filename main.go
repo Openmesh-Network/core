@@ -18,6 +18,7 @@ import (
 	"github.com/openmesh-network/core/logger"
 	"github.com/openmesh-network/core/networking/p2p"
 	rp "github.com/openmesh-network/core/resourcepool"
+	"github.com/openmesh-network/core/tracker"
 	"github.com/openmesh-network/core/updater"
 )
 

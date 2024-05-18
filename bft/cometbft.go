@@ -10,17 +10,18 @@ import (
 	"strconv"
 	"time"
 
+	validatorpass_tracker "github.com/Openmesh-Network/nft-authorise/tracker"
+
 	cfg "github.com/cometbft/cometbft/config"
 	cmtflags "github.com/cometbft/cometbft/libs/cli/flags"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	nm "github.com/cometbft/cometbft/node"
 	bftp2p "github.com/cometbft/cometbft/p2p"
+
 	"github.com/cometbft/cometbft/privval"
 	"github.com/cometbft/cometbft/proxy"
-	"github.com/cometbft/cometbft/types"
-	"google.golang.org/protobuf/proto"
-
 	rpctypes "github.com/cometbft/cometbft/rpc/jsonrpc/types"
+	"github.com/cometbft/cometbft/types"
 	abci "github.com/openmesh-network/core/bft/abci"
 	otypes "github.com/openmesh-network/core/bft/types"
 	"github.com/openmesh-network/core/collector"
@@ -28,6 +29,7 @@ import (
 	log "github.com/openmesh-network/core/logger"
 	"github.com/openmesh-network/core/resourcepool"
 	"github.com/spf13/viper"
+	"google.golang.org/protobuf/proto"
 )
 
 // Instance is the CometBFT instance

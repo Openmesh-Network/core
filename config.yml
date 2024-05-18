@@ -43,7 +43,3 @@ log:
     maxSize: 10
     maxAge: 7
     maxBackups: 10
-nft:
-  trackerData: ./cbft/data/nft-tracked
-  rpcAddress: https://rpc.ankr.com/eth_sepolia
-  unlimitedRPC: false
