@@ -269,6 +269,7 @@ func (inst *Instance) Start(ctx context.Context) {
 					}
 
 					log.Debug("Pushed ", transactionPushedCount, "/", len(summaries))
+
 				}
 			}
 		}
@@ -280,6 +281,11 @@ func (inst *Instance) Start(ctx context.Context) {
 			log.Fatalf("Failed to start CometBFT node: %s", err.Error())
 		}
 	}()
+}
+
+func (i *Instance) SetTracker(tracker *validatorpass_tracker.Tracker) error {
+	i.app.Tracker = tracker
+	return nil
 }
 
 // Stop the CometBFT node

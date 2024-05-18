@@ -6,6 +6,12 @@ enum TransactionType {
   VerificationTransaction = 1;
   ResourceTransaction = 2;
   NodeRegistrationTransaction = 3;
+  SummaryTransaction = 4;
+  PolygonCheckpointTransaction = 5;
+}
+message PolygonCheckpointTransactionData {
+  uint64 blockno = 1;
+  string blockhash = 2;
 }
 
 message VerificationTransactionData {

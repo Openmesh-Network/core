@@ -1,6 +1,8 @@
 module github.com/openmesh-network/core
 
-go 1.21
+go 1.22.1
+
+toolchain go1.22.3
 
 require (
 	github.com/721tools/stream-api-go v0.0.0-20230909092603-b6a8806ed69a
@@ -35,6 +37,7 @@ require (
 require (
 	github.com/Jorropo/jsync v1.0.1 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
+	github.com/Openmesh-Network/nft-authorise v0.0.0-20240509074056-66765710e7e3 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alecthomas/units v0.0.0-20231202071711-9a357b53e9c9 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect

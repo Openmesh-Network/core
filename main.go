@@ -81,6 +81,11 @@ func main() {
 		collectorInstance.Start(cancelCtx)
 	}
 
+	trackerInstance, err := tracker.NewInstance()
+	if err != nil {
+		logger.Fatalf("Failed to initialise tracker instance: %s", err.Error())
+	}
+
 	// Initialise CometBFT instance
 	bftInstance, err := bft.NewInstance(collectorInstance)
 	if err != nil {
@@ -97,7 +102,7 @@ func main() {
 	// Build and start top-level instance.
 	ins := core.NewInstance().
 		SetP2pInstance(p2pInstance).
-		SetBFTInstance(bftInstance)
+		SetBFTInstance(bftInstance).SetTrackerInstance(trackerInstance)
 	ins.Start(cancelCtx)
 	logger.Infof("Openmesh Core started successfully.")
 	defer ins.Stop()

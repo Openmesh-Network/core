@@ -13,11 +13,22 @@ var Config config
 
 // config is the configuration structure for the whole Openmesh Core project
 type config struct {
+	Nft  TrConfig  `yaml:"nft"`
 	P2P  P2pConfig `yaml:"p2p"`
 	Prof Profiling `yaml:"prof"`
 	BFT  BFTConfig `yaml:"bft"`
 	Log  LogConfig `yaml:"log"`
 	DB   DBConfig  `yaml:"db"`
+}
+
+type TrConfig struct {
+	RpcAddress     string `yaml:"rpcAddress"`
+	UnlimitedRPC   bool   `yaml:"unlimitedRPC"`
+	EventSignature string `yaml:"eventSignature"`
+	SearchLimit    int    `yaml:"searchLimit"`
+	DeployBlock    int    `yaml:"DeployBlock"` // Corrected field name
+	Confirmations  int    `yaml:"confirmations"`
+	Timing         int    `yaml:"timing"` // Corrected field name
 }
 
 type P2pConfig struct {

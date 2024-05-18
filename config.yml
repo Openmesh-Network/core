@@ -8,6 +8,14 @@ prof:
   enable: true
   enableHttp: false
   fileName: cpuprofile.prof
+nft:
+  rpcAddress: https://rpc.ankr.com/eth_sepolia
+  unlimitedRPC: false
+  eventSignature: Redeemed(uint256,bytes32)
+  searchLimit: 3000
+  deployBlock: 5618691
+  confirmations: 20
+  timing: 90
 bft:
   homeDir: cbft-home
   mockTransactions: false
