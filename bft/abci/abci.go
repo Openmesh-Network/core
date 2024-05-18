@@ -537,7 +537,10 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 		// log.Debug("Resource Transaction Data:", nodeRegistrationData)
 		return 0
 
+	case types.TransactionType_SummaryTransaction:
+		return 0
 	default:
+
 		log.Error("Unknown transaction type")
 		return 1
 	}

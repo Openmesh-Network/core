@@ -98,7 +98,7 @@ func NewInstance(collector *collector.CollectorInstance) (*Instance, error) {
 		nm.DefaultMetricsProvider(conf.Instrumentation),
 		log,
 	)
-
+	app.Node = node
 	if err != nil {
 		return nil, err
 	}
