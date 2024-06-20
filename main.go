@@ -63,6 +63,11 @@ func main() {
 	// Initialise p2p instance.
 	var p2pInstance *p2p.Instance
 	var err error
+	trackerInstance, err := tracker.NewInstance()
+	if err != nil {
+		logger.Fatalf("Failed to initialise tracker instance: %s", err.Error())
+	}
+	trackerInstance.Start(cancelCtx)
 
 	p2pInstance, err = p2p.NewInstance(cancelCtx, config.Config.P2P).Build()
 	if err != nil {
@@ -82,13 +87,8 @@ func main() {
 		collectorInstance.Start(cancelCtx)
 	}
 
-	trackerInstance, err := tracker.NewInstance()
-	if err != nil {
-		logger.Fatalf("Failed to initialise tracker instance: %s", err.Error())
-	}
-
 	// Initialise CometBFT instance
-	bftInstance, err := bft.NewInstance(collectorInstance)
+	bftInstance, err := bft.NewInstance(collectorInstance, *trackerInstance.Tracker)
 	if err != nil {
 		logger.Fatalf("Failed to initialise CometBFT instance: %s", err.Error())
 	}

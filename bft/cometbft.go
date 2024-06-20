@@ -44,7 +44,7 @@ type Instance struct {
 }
 
 // NewInstance initialise a CometBFT instance use the config specified
-func NewInstance(collector *collector.CollectorInstance) (*Instance, error) {
+func NewInstance(collector *collector.CollectorInstance, tracker validatorpass_tracker.Tracker) (*Instance, error) {
 	conf := cfg.DefaultConfig()
 	homeDir := config.Config.BFT.HomeDir
 	conf.SetRoot(homeDir)
@@ -86,7 +86,7 @@ func NewInstance(collector *collector.CollectorInstance) (*Instance, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	app.Tracker = &tracker
 	// Create CometBFT node
 	node, err := nm.NewNode(
 		conf,
@@ -98,7 +98,9 @@ func NewInstance(collector *collector.CollectorInstance) (*Instance, error) {
 		nm.DefaultMetricsProvider(conf.Instrumentation),
 		log,
 	)
+
 	app.Node = node
+
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +174,7 @@ func (inst *Instance) Start(ctx context.Context) {
 											NodeAddress:     base64AddrString,
 											NodeAttestation: "",
 											NodeSignature:   "",
+											TokenID:         "0x0000000000000000000000000000000000000000000000000000000000000001",
 										},
 									},
 								}
@@ -184,9 +187,9 @@ func (inst *Instance) Start(ctx context.Context) {
 								transaction := types.Tx(transactionBytes[:])
 
 								log.Debug("Pushing registration transaction with hash: ", sha256.Sum256(transactionBytes))
-								_, err = env.BroadcastTxAsync(&rpctypes.Context{}, transaction)
-
-								if err != nil {
+								broadcastResults, err := env.BroadcastTxSync(&rpctypes.Context{}, transaction)
+								log.Debug(broadcastResults.Code)
+								if err != nil || broadcastResults.Code != 0 {
 									log.Error("Failed to push registration transaction: ", err)
 								} else {
 									log.Debug("Succesfully pushed registration transaction!")

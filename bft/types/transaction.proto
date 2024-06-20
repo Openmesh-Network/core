@@ -31,10 +31,15 @@ message NormalTransactionData {
 }
 
 // Node Registration Transaction Data
+// nodeSignature is the signature of lastblockhash signed with the publickey of the node 
+// nodeAddress here refers to the publickey of the node and not the address
+// their can be a case of someone repeating a transaction on multiple blocks but this doesn't affect because they won't be able to join as validators
+// nodeSignature is needed as we don't want people to spam the network on behalf of someone else
 message NodeRegistrationTransactionData {
   string nodeAddress = 1;
   string nodeAttestation = 2;
-  string nodeSignature = 3;
+  string nodeSignature = 3;  
+  string tokenID = 4;
 }
 message SummaryTransactionData {
   string hash = 1;

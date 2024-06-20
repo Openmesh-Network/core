@@ -81,6 +81,7 @@ func (app *VerificationApp) PrepareProposal(_ context.Context, proposal *abcityp
 	for _, slice := range proposal.Txs {
 		var transaction types.Transaction
 		err := proto.Unmarshal(slice, &transaction)
+
 		if err != nil {
 			log.Error("Error unmarshaling transaction data:", err)
 		}
@@ -211,6 +212,11 @@ func (app *VerificationApp) ProcessProposal(_ context.Context, proposal *abcityp
 				}
 				log.Debug("they are similar")
 
+			case types.TransactionType_NodeRegistrationTransaction:
+				registrationData := &types.NodeRegistrationTransactionData{}
+				registrationData = transaction.GetNodeRegistrationData()
+				log.Debug(registrationData)
+
 			case types.TransactionType_PolygonCheckpointTransaction:
 				log.Debug("polygon tx found")
 				checkpointData := &types.PolygonCheckpointTransactionData{}
@@ -308,11 +314,6 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 
 				publicKeyString := registrationData.GetNodeAddress()
 				pubKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyString)
-				if err != nil {
-					log.Error("Error decoding Base64:", err)
-
-				}
-
 				var publicKeyMessage = &crypt.PublicKey{
 					Sum: &crypt.PublicKey_Ed25519{
 						Ed25519: pubKeyBytes,
@@ -320,26 +321,20 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 				}
 
 				if err != nil {
-					log.Error("Error marshalling PublicKey message:", err)
-				}
-
-				if err != nil {
-					log.Debug("problem alert", err)
-				}
-
-				if err != nil {
 					// Handle error, e.g., invalid public key format
 					log.Error("Error: invalid pubkey index %v", i)
 					txs[i] = &abcitypes.ExecTxResult{Code: 1}
+				} else {
+
+					txs[i] = &abcitypes.ExecTxResult{}
+					validatorup := &abcitypes.ValidatorUpdate{
+						PubKey: *publicKeyMessage,
+						Power:  1,
+					}
+					validatorupdates = append(validatorupdates, *validatorup)
+					log.Debug("Node succesfully registered: ", len(validatorupdates))
 				}
 
-				txs[i] = &abcitypes.ExecTxResult{}
-				validatorup := &abcitypes.ValidatorUpdate{
-					PubKey: *publicKeyMessage,
-					Power:  10,
-				}
-				validatorupdates = append(validatorupdates, *validatorup)
-				log.Debug("Node succesfully registered: ", len(validatorupdates))
 				// log.Debug("Node Registration Transaction Data:", registrationData)
 			case types.TransactionType_PolygonCheckpointTransaction:
 				polygonData := &types.PolygonCheckpointTransactionData{}
@@ -523,8 +518,34 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 			log.Error("Error unmarshaling resource transaction data:", err)
 			return 1
 		}
+
+		publicKeyString := nodeRegistrationData.GetNodeAddress()
+
+		if validatorpass_tracker.VerifyValidatorAddress(publicKeyString, nodeRegistrationData.TokenID, app.Tracker) {
+			pubKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyString)
+			if err != nil {
+				log.Error("Error decoding Base64:", err)
+
+			}
+
+			var _ = &crypt.PublicKey{
+				Sum: &crypt.PublicKey_Ed25519{
+					Ed25519: pubKeyBytes,
+				},
+			}
+
+			if err != nil {
+				// Handle error, e.g., invalid public key format
+				log.Error("Error: invalid pubkey index")
+				return 1
+			}
+			return 0
+		} else {
+			log.Error("Error: Notable to verify stuff pubkey index")
+			return 1
+		}
 		// log.Debug("Resource Transaction Data:", nodeRegistrationData)
-		return 0
+		return 1
 
 	case types.TransactionType_PolygonCheckpointTransaction:
 		polygonData := &types.PolygonCheckpointTransactionData{}

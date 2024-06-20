@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/openmesh-network/core/bft"
 	"github.com/openmesh-network/core/config"
 	"github.com/openmesh-network/core/database"
@@ -54,9 +55,9 @@ func (i *Instance) Start(ctx context.Context) {
 		logger.Debug("Connecting to libp2p multiaddress in config...")
 		i.pi.ConnectFromMultiaddr(ctx, config.Config.P2P.DebugAutoconnectMultiaddr)
 	}
-	i.Tracker.Start(ctx)
+
+	log.Error("Starting BFT")
 	i.BFT.Start(ctx)
-	i.BFT.SetTracker(i.Tracker.Tracker)
 
 }
 
