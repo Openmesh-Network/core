@@ -16,6 +16,7 @@ nft:
   deployBlock: 5618691
   confirmations: 20
   timing: 90
+  istest: true
 bft:
   homeDir: cbft-home
   mockTransactions: false

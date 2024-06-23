@@ -521,7 +521,7 @@ func (app *VerificationApp) isValid(tx []byte) uint32 {
 
 		publicKeyString := nodeRegistrationData.GetNodeAddress()
 
-		if validatorpass_tracker.VerifyValidatorAddress(publicKeyString, nodeRegistrationData.TokenID, app.Tracker) {
+		if validatorpass_tracker.VerifyValidatorAddress(publicKeyString, nodeRegistrationData.TokenID, app.Tracker) || config.Config.Nft.IsTest == true {
 			pubKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyString)
 			if err != nil {
 				log.Error("Error decoding Base64:", err)

@@ -29,6 +29,7 @@ type TrConfig struct {
 	DeployBlock    int    `yaml:"DeployBlock"` // Corrected field name
 	Confirmations  int    `yaml:"confirmations"`
 	Timing         int    `yaml:"timing"` // Corrected field name
+	IsTest         bool   `yaml:"istest"`
 }
 
 type P2pConfig struct {
