@@ -281,11 +281,6 @@ func (app *VerificationApp) FinalizeBlock(_ context.Context, req *abcitypes.Requ
 			}
 		}
 
-		// Need to have this info available somewhere...
-
-		// XXX: Remove this from finalizeblock? Remove from abci?
-		// Only run this when requested maybe?
-
 		log.Info("Done sorting preferences, writting our requests.")
 	}
 

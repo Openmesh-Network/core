@@ -16,15 +16,19 @@ type Stream struct {
 	cidHashes           []cid.Cid
 	compressedBuffer    []byte
 	compressedBufferOld []byte
+	messageOffsets      []int16
 }
 
-func (inst *Instance) NewStream() *Stream {
+// Overallocating because compression ratio is variable.
+const MESSAGE_OFFSET_COUNT = DEFAULT_CHUNK_SIZE * 20 / (MINIMUM_MESSAGE_SIZE * 2)
 
+func (inst *Instance) NewStream() *Stream {
 	s := &Stream{
 		inst:                inst,
 		buffer:              make([]byte, 0, DEFAULT_CHUNK_SIZE*4),
 		compressedBuffer:    make([]byte, 0, DEFAULT_CHUNK_SIZE*4),
 		compressedBufferOld: make([]byte, 0, DEFAULT_CHUNK_SIZE*4),
+		messageOffsets:      make([]int16, 0, MESSAGE_OFFSET_COUNT),
 		cidHashes:           make([]cid.Cid, 0),
 	}
 	return s
@@ -46,7 +50,7 @@ func (s *Stream) flush(buffer []byte) {
 	// Add buffer to blockstore with padding and reset buffer.
 
 	size := len(buffer)
-	for i := 0; i < cap(buffer)-size; i++ {
+	for i := 0; i < DEFAULT_CHUNK_SIZE-size; i++ {
 		buffer = append(buffer, 0)
 	}
 
@@ -110,6 +114,42 @@ func (s *Stream) Append(message []byte) {
 	// 	}
 	// }
 
+	//for {
+	//	if len(message) == 0 {
+	//		return
+	//	}
+
+	//	stride := min(80, len(message))
+	//	s.buffer = append(s.buffer, message[:stride]...)
+
+	//	s.compressedBufferOld = s.compressedBufferOld[:0]
+	//	s.compressedBufferOld = append(s.compressedBufferOld, s.compressedBuffer...)
+
+	//	s.compressedBuffer = s.compressedBuffer[:0]
+
+	//	// XXX: Improve performance here, options:
+	//	//	- Use faster implementation.
+	//	//	- Use stream API to reduce overhead?
+	//	s.compressedBuffer = encoder.EncodeAll(s.buffer, s.compressedBuffer)
+
+	//	if len(s.compressedBuffer) > DEFAULT_CHUNK_SIZE {
+	//		s.flush(s.compressedBufferOld)
+	//		// Whatever was leftover
+	//	} else {
+	//		message = message[stride:]
+	//	}
+	//}
+
+	//return
+
+	// if len(message) > DEFAULT_CHUNK_SIZE {
+	// 	fmt.Println("Splitting:", len(message)/2)
+	// 	s.Append(message[:len(message)/2])
+	// 	s.Append(message[len(message)/2:])
+
+	// 	return
+	// }
+
 	s.buffer = append(s.buffer, message...)
 
 	s.compressedBufferOld = s.compressedBufferOld[:0]
@@ -122,11 +162,27 @@ func (s *Stream) Append(message []byte) {
 	s.compressedBuffer = encoder.EncodeAll(s.buffer, s.compressedBuffer)
 
 	if len(s.compressedBuffer) > DEFAULT_CHUNK_SIZE {
-		s.Flush()
+		// Shouldn't flush sometimes!!
+		if len(s.compressedBufferOld) > 0 {
+			s.Flush()
+		} else {
+			s.buffer = s.buffer[len(message):]
+			// s.resetBuffers()
 
-		s.Append(message[:len(message)/2])
-		s.Append(message[len(message)/2:])
+			// XXX: This is 100% incorrect lmao. OR is it?
+			s.Append(message[:len(message)/2])
+			s.Append(message[len(message)/2:])
+
+			// Check again maybe?
+			if len(s.compressedBuffer) > DEFAULT_CHUNK_SIZE {
+				if len(s.compressedBufferOld) > 0 {
+					s.Flush()
+				}
+			}
+		}
 	}
+
+	// Conditional flush maybe?
 }
 
 func (s *Stream) GetCids() []cid.Cid {

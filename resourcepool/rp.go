@@ -27,6 +27,12 @@ import (
 
 const DEFAULT_CHUNK_SIZE = 4096
 
+// Minimum size of a message in a chunk. Messages smaller than this will get additional padding.
+// NOTE This number is calculated from the pessimistic assumption that a source will output a maximum of 30kb with 15 minute block time.
+// This might be overkill, but we only pay the cost when we're uncompressing / compressing data.
+// Given the data is compressed, this padding will increase the efficiency of the data.
+const MINIMUM_MESSAGE_SIZE = 200
+
 type Instance struct {
 	Bservice  blockservice.BlockService
 	Bstore    blockstore.Blockstore
@@ -50,6 +56,25 @@ type BlockManager struct {
 	cidToBucketIndex map[cid.Cid]int // 0 index is invalid.
 	bService         blockservice.BlockService
 }
+
+// type DataChunkV1Stored struct {
+// 	id             int32
+// 	info           int32
+// 	compressedData []byte
+// }
+
+// type DataChunkHeader struct {
+// 	messageOffsets []int16
+// }
+
+// type DataChunkV1Memory struct {
+// 	id             int32
+// 	Start          bool
+// 	End            bool
+// 	MessageCount   int
+// 	MessageOffsets []int16
+// 	Data           []byte
+// }
 
 func NewInstance(p2pinst *p2p.Instance) *Instance {
 	var inst Instance
