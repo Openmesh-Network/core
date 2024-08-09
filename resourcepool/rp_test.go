@@ -3,6 +3,7 @@ package resourcepool
 import (
 	"context"
 	"testing"
+	"time"
 
 	bsclient "github.com/ipfs/boxo/bitswap/client"
 	bsnet "github.com/ipfs/boxo/bitswap/network"
@@ -13,6 +14,8 @@ import (
 	"github.com/ipfs/go-datastore"
 	dsync "github.com/ipfs/go-datastore/sync"
 	routinghelpers "github.com/libp2p/go-libp2p-routing-helpers"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/openmesh-network/core/updater"
 	"github.com/stretchr/testify/assert"
 )
@@ -94,5 +97,34 @@ func TestAddBlocks(t *testing.T) {
 
 		bmanager.AddBlocks(ctx, bs)
 		assert.True(bmanager.blocksUsed == 64)
+	}
+}
+
+func TestQueryIPFSBlocks(t *testing.T) {
+	assert := assert.New(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	h := updater.NewHost()
+	// Use bootstrapping to find node or use a reliable public node
+	ipfsNode := "/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWSN7WdZFAPk3313uxTYapxk4Lhc974CkNDu9Ke2dRiNrA"
+	addr, err := peer.AddrInfoFromP2pAddr(multiaddr.StringCast(ipfsNode))
+	assert.Nil(err)
+
+	bsnetwork := bsnet.NewFromIpfsHost(h, routinghelpers.Null{})
+	bstore := blockstore.NewBlockstore(dsync.MutexWrap(datastore.NewMapDatastore()))
+	bstore = blockstore.NewIdStore(bstore)
+	bclient := bsclient.New(ctx, bsnetwork, bstore)
+	bsnetwork.Start(bclient)
+
+	err = h.Connect(ctx, *addr)
+	assert.Nil(err)
+
+	{
+		queryCid := cid.MustParse("bafkreihunxxowxpx2zzmswyiddnswyqgxooij3eg7o5j4g2mbnv7vwk4ya")
+		block, err := bclient.GetBlock(ctx, queryCid)
+		assert.Nil(err)
+		assert.Equal(`{"title":"Test","tags":[{"tag":"Test"}],"projectSize":0,"teamSize":0,"description":"<p>Test</p>","resources":"","links":[]}`, string(block.RawData()[:]))
 	}
 }
