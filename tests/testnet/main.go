@@ -54,7 +54,7 @@ func ipToInt(ip string) uint32 {
 }
 
 func cbftInit(absoluteDirectory string) {
-	cmd := exec.Command("cometbft", "init", "--home", absoluteDirectory)
+	cmd := exec.Command("go", "run", "github.com/cometbft/cometbft/cmd/cometbft@v0.38", "init", "--home", absoluteDirectory)
 	err := cmd.Run()
 	if err != nil {
 		panic(err)
@@ -62,7 +62,7 @@ func cbftInit(absoluteDirectory string) {
 }
 
 func cbftGetId(absoluteDirectory string) string {
-	cmd := exec.Command("cometbft", "show-node-id", "--home", absoluteDirectory)
+	cmd := exec.Command("go", "run", "github.com/cometbft/cometbft/cmd/cometbft@v0.38", "show-node-id", "--home", absoluteDirectory)
 	buf := new(bytes.Buffer)
 	cmd.Stderr = buf
 

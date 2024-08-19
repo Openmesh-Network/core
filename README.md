@@ -3,7 +3,8 @@
 This is the repository of Openmesh Core which can operate as standalone software or as apart of an Xnode.
 
 ## What is Openmesh Core?
-Openmesh core is node software for interacting with the openmesh network to collect, seed and fetch data chosen by the Openmesh DAO. The core operates within an Intel SGX trusted execution environment, which it uses to prove to other nodes that it is running the same software.
+Openmesh core is node software for interacting with the openmesh network to collect, seed and fetch data chosen by the Openmesh DAO. 
+The core operates within an Intel SGX trusted execution environment, which it uses to prove to other nodes that it is running the same software.
 
 ## Usage
 
